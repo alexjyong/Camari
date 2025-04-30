@@ -3,9 +3,14 @@
     <name>Camari</name>
     <description>App that allows you to use your phone as a webcam</description>
     <author email="alexjyong@gmail.com" href="https://alexjyong.dev">
-        Apache Cordova Team
+        Alex Yong
     </author>
     <content src="index.html" />
     <allow-intent href="http://*/*" />
     <allow-intent href="https://*/*" />
+    <platform name="android">
+        <preference name="android-minSdkVersion" value="24" />
+    </platform>
 </widget>
+
+
