@@ -9,6 +9,8 @@
 <body>
   <h1>📷 Camera Streamer</h1>
   <p>Status: <span id="status">Initializing...</span></p>
+  <p>📡 Streaming at: <span id="ip-address">Detecting...</span></p>
+  <button onclick="cameraModule.toggleCamera()">🔄 Switch Camera</button>
 
   <script src="cordova.js"></script>
   <script src="js/cameraModule.js"></script>
@@ -16,5 +18,7 @@
   <script src="js/streamingModule.js"></script>
   <script src="js/serverModule.js"></script>
   <script src="js/index.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+  <script>eruda.init();</script>
 </body>
 </html>

@@ -15,7 +15,7 @@
   "devDependencies": {
     "cordova-android": "^13.0.0",
     "cordova-plugin-camera-preview": "^0.13.0",
-    "cordova-plugin-webserver": "github:bykof/cordova-plugin-webserver"
+    "cordova-plugin-webserver": "github:alexjyong/cordova-plugin-webserver"
   },
   "cordova": {
     "platforms": [

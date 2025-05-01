@@ -37,7 +37,16 @@ body {
     width:100%;
 }
 
-#status { font-weight: bold; color: green; }
+#status, #ip-address {
+    font-weight: bold;
+    color: green;
+  }
+  
+button {
+padding: 10px 20px;
+font-size: 16px;
+margin-top: 20px;
+}
 
 /* Portrait layout (default) */
 .app {
