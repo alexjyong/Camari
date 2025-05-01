@@ -12,7 +12,7 @@ var streamingModule = (function () {
           if (req.path === '/') {
             webserver.sendResponse(req.requestId, {
               status: 200,
-              body: htmlPlayer.get(),  
+              body: 'hi there I work!',  
               headers: { 'Content-Type': 'text/html' }
             });
           } else {
