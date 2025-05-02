@@ -25,6 +25,7 @@ var streamingModule = (function () {
         });
 
         setInterval(function () {
+          console.log("interval tick")
           cameraModule.captureFrame(function (frame) {
             const base64 = frame.split(',')[1];
             console.log("pushing to webserver stream")
