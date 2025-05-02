@@ -24,14 +24,14 @@ var streamingModule = (function () {
           }
         });
 
-        setInterval(function () {
-          console.log("interval tick")
-          cameraModule.captureFrame(function (frame) {
-            const base64 = frame.split(',')[1];
-            console.log("pushing to webserver stream")
-            webserver.pushFrame(base64, null, console.error);
-          });
-        }, 100); // about 10 fps here. should be configurable later
+        // setInterval(function () {
+        //   console.log("interval tick")
+        //   cameraModule.captureFrame(function (frame) {
+        //     const base64 = frame.split(',')[1];
+        //     console.log("pushing to webserver stream")
+        //     webserver.pushFrame(base64, null, console.error);
+        //   });
+        // }, 100); // about 10 fps here. should be configurable later
       },
       function error(err) {
         console.error("Server failed to start", err);

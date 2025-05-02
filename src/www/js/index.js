@@ -1,6 +1,6 @@
 document.addEventListener("deviceready", function () {
   document.getElementById('status').textContent = 'Starting...';
-  cameraModule.startCamera();
+  //cameraModule.startCamera();
   streamingModule.start();
   document.getElementById('status').textContent = 'Streaming!';
 
