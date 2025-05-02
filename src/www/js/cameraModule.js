@@ -4,10 +4,10 @@ var cameraModule = (function () {
   var startCamera = function () {
     CameraPreview.startCamera({
       x: 0, y: 0,
-      width: window.screen.width,
-      height: window.screen.height,
+      width: 1,
+      height: 1,
       camera: currentFacing,
-      toBack: true
+      toBack: false
     });
   };
 
