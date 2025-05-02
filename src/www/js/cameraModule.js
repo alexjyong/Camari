@@ -17,10 +17,18 @@ var cameraModule = (function () {
   };
 
   var captureFrame = function (callback) {
-    CameraPreview.takePicture({ width: 640, height: 480, quality: 80 }, function (imgData) {
+  console.log("Calling takePicture");
+  CameraPreview.takePicture(
+    { width: 640, height: 480, quality: 80 },
+    function (imgData) {
+      console.log("Got picture");
       callback("data:image/jpeg;base64," + imgData);
-    });
-  };
+    },
+    function (err) {
+      console.error("Error taking picture:", err);
+    }
+  );
+};
 
   return {
     startCamera,
