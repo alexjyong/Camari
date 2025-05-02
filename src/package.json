@@ -14,6 +14,7 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "cordova-android": "^13.0.0",
+    "cordova-plugin-background-mode": "github:katzer/cordova-plugin-background-mode",
     "cordova-plugin-camera-preview": "^0.13.0",
     "cordova-plugin-webserver": "github:alexjyong/cordova-plugin-webserver"
   },
@@ -23,7 +24,8 @@
     ],
     "plugins": {
       "cordova-plugin-camera-preview": {},
-      "cordova-plugin-webserver": {}
+      "cordova-plugin-webserver": {},
+      "cordova-plugin-background-mode": {}
     }
   }
 }

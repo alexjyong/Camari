@@ -1,5 +1,6 @@
 document.addEventListener("deviceready", function () {
   document.getElementById('status').textContent = 'Starting...';
+  cordova.plugins.backgroundMode.enable();
   //cameraModule.startCamera();
   streamingModule.start();
   document.getElementById('status').textContent = 'Streaming!';
