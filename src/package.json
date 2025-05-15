@@ -15,17 +15,14 @@
   "devDependencies": {
     "cordova-android": "^13.0.0",
     "cordova-plugin-background-mode": "github:katzer/cordova-plugin-background-mode",
-    "cordova-plugin-camera-preview": "^0.13.0",
-    "cordova-plugin-webserver": "github:alexjyong/cordova-plugin-webserver"
+    "nodejs-mobile-cordova": "^0.4.3"
   },
   "cordova": {
     "platforms": [
       "android"
     ],
     "plugins": {
-      "cordova-plugin-camera-preview": {},
-      "cordova-plugin-webserver": {},
-      "cordova-plugin-background-mode": {}
+      "nodejs-mobile-cordova": {}
     }
   }
 }
