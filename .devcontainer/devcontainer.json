@@ -3,8 +3,7 @@
     "features": {
       "ghcr.io/devcontainers/features/docker-in-docker:2": {},
       "ghcr.io/nordcominc/devcontainer-features/android-sdk:1": {
-          "extra_packages": "ndk;28.1.13356709 sources;android-32"
-      },
-      "ghcr.io/devcontainers-extra/features/gradle-sdkman:2": {}
+          "extra_packages": "ndk;28.1.13356709"
+      }
     }
   }
