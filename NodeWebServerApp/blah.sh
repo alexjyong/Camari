@@ -1,0 +1,1 @@
+docker run --rm -i -v $PWD:/workspace -w /workspace --privileged localcordova sh -c "bash"
