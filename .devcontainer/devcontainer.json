@@ -1,0 +1,21 @@
+{
+    "image": "mcr.microsoft.com/devcontainers/universal:2",
+    "features": {
+      "ghcr.io/nordcominc/devcontainer-features/android-sdk:1": {},
+      "ghcr.io/devcontainers/features/java:1": {
+        "version": "21",
+        "jdkDistro": "oracle"
+      }
+    },
+    "postCreateCommand": "sudo apt-get -y install magic-wormhole",
+    "customizations": {
+      "vscode": {
+        "extensions": [
+          "redhat.java",
+          "vscjava.vscode-java-pack",
+          "kotlin.kotlin",
+          "fwcd.kotlin"
+        ]
+      }
+    }
+}
