@@ -7,7 +7,7 @@
         "jdkDistro": "oracle"
       }
     },
-    "postCreateCommand": "sudo apt-get -y install magic-wormhole",
+    "postCreateCommand": "sudo apt-get -y install magic-wormhole && curl -LsSf https://astral.sh/uv/install.sh | sh",
     "customizations": {
       "vscode": {
         "extensions": [
