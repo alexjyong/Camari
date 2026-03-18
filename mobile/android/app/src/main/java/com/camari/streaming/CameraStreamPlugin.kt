@@ -37,33 +37,51 @@ class CameraStreamPlugin : Plugin() {
     
     companion object {
         private const val DEFAULT_PORT = 8080
+        private const val TAG = "CameraStreamPlugin"
     }
 
     override fun load() {
         super.load()
-        networkStatus = NetworkStatus(activity)
-        batteryMonitor = BatteryMonitor(activity)
+        try {
+            networkStatus = NetworkStatus(activity)
+            batteryMonitor = BatteryMonitor(activity)
+            android.util.Log.i(TAG, "Plugin loaded successfully")
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Error loading plugin: ${e.message}")
+        }
     }
 
     @PluginMethod
     fun startStreaming(call: PluginCall) {
+        android.util.Log.i(TAG, "startStreaming called")
+        
         if (!hasCameraPermission()) {
+            android.util.Log.w(TAG, "Camera permission not granted, requesting...")
             requestPermissionForAlias("camera", call, "cameraPermissionCallback")
             return
         }
 
         try {
+            // Clean up any existing resources first
+            stopInternal()
+            
+            // Initialize camera manager
             cameraManager = CameraManager(activity)
             cameraManager?.setCameraType(currentCameraType)
             cameraManager?.startCamera()
             
+            // Initialize and start HTTP server
             httpServer = HttpServer(DEFAULT_PORT, cameraManager!!)
             httpServer?.start()
             
+            // Get network info
             val ipAddress = networkStatus?.getIpAddress() ?: "192.168.1.100"
             val ssid = networkStatus?.getNetworkSsid() ?: "WiFi"
             val streamUrl = "http://$ipAddress:$DEFAULT_PORT/stream"
             
+            android.util.Log.i(TAG, "Streaming started: $streamUrl")
+            
+            // Build result
             val result = JSObject()
             result.put("streamUrl", streamUrl)
             result.put("ipAddress", ipAddress)
@@ -75,12 +93,28 @@ class CameraStreamPlugin : Plugin() {
             call.resolve(result)
             
         } catch (e: Exception) {
+            android.util.Log.e(TAG, "Error starting streaming: ${e.message}", e)
             call.reject("Failed to start streaming: ${e.message}")
         }
     }
 
     @PluginMethod
     fun stopStreaming(call: PluginCall) {
+        android.util.Log.i(TAG, "stopStreaming called")
+        
+        try {
+            stopInternal()
+            call.resolve()
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Error stopping streaming: ${e.message}", e)
+            call.reject("Failed to stop streaming: ${e.message}")
+        }
+    }
+    
+    /**
+     * Internal stop method that cleans up resources.
+     */
+    private fun stopInternal() {
         try {
             httpServer?.stop()
             httpServer = null
@@ -89,16 +123,18 @@ class CameraStreamPlugin : Plugin() {
             cameraManager = null
             
             isStreaming = false
-            call.resolve()
-            
+            android.util.Log.i(TAG, "Resources cleaned up")
         } catch (e: Exception) {
-            call.reject("Failed to stop streaming: ${e.message}")
+            android.util.Log.e(TAG, "Error in stopInternal: ${e.message}", e)
         }
     }
 
     @PluginMethod
     fun switchCamera(call: PluginCall) {
+        android.util.Log.i(TAG, "switchCamera called")
+        
         if (!isStreaming) {
+            android.util.Log.w(TAG, "Not streaming, cannot switch camera")
             call.reject("Not currently streaming")
             return
         }
@@ -107,6 +143,8 @@ class CameraStreamPlugin : Plugin() {
             currentCameraType = if (currentCameraType == "front") "back" else "front"
             cameraManager?.setCameraType(currentCameraType)
             
+            android.util.Log.i(TAG, "Switched to $currentCameraType camera")
+            
             val result = JSObject()
             result.put("cameraType", currentCameraType)
             result.put("success", true)
@@ -114,6 +152,7 @@ class CameraStreamPlugin : Plugin() {
             call.resolve(result)
             
         } catch (e: Exception) {
+            android.util.Log.e(TAG, "Error switching camera: ${e.message}", e)
             val result = JSObject()
             result.put("cameraType", currentCameraType)
             result.put("success", false)
@@ -123,23 +162,29 @@ class CameraStreamPlugin : Plugin() {
 
     @PluginMethod
     fun getStatus(call: PluginCall) {
-        val result = JSObject()
-        
-        val status = when {
-            !isStreaming -> "idle"
-            networkStatus?.isConnected() == false -> "reconnecting"
-            else -> "streaming"
+        try {
+            val result = JSObject()
+            
+            val status = when {
+                !isStreaming -> "idle"
+                networkStatus?.isConnected() == false -> "reconnecting"
+                else -> "streaming"
+            }
+            
+            result.put("status", status)
+            result.put("cameraType", if (isStreaming) currentCameraType else null)
+            result.put("batteryLevel", batteryMonitor?.getBatteryLevel() ?: 0)
+            result.put("isCharging", batteryMonitor?.isCharging() ?: false)
+            result.put("isLowBattery", batteryMonitor?.isLowBattery() ?: false)
+            result.put("networkSsid", networkStatus?.getNetworkSsid())
+            result.put("ipAddress", networkStatus?.getIpAddress())
+            
+            call.resolve(result)
+            
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Error getting status: ${e.message}", e)
+            call.reject("Failed to get status: ${e.message}")
         }
-        
-        result.put("status", status)
-        result.put("cameraType", if (isStreaming) currentCameraType else null)
-        result.put("batteryLevel", batteryMonitor?.getBatteryLevel() ?: 0)
-        result.put("isCharging", batteryMonitor?.isCharging() ?: false)
-        result.put("isLowBattery", batteryMonitor?.isLowBattery() ?: false)
-        result.put("networkSsid", networkStatus?.getNetworkSsid())
-        result.put("ipAddress", networkStatus?.getIpAddress())
-        
-        call.resolve(result)
     }
 
     private fun hasCameraPermission(): Boolean {
@@ -151,10 +196,24 @@ class CameraStreamPlugin : Plugin() {
 
     @PermissionCallback
     private fun cameraPermissionCallback(call: PluginCall) {
+        android.util.Log.i(TAG, "Permission callback called")
+        
         if (hasCameraPermission()) {
+            android.util.Log.i(TAG, "Permission granted, starting streaming")
             startStreaming(call)
         } else {
+            android.util.Log.w(TAG, "Permission denied")
             call.reject("Camera permission denied")
         }
+    }
+    
+    /**
+     * Clean up resources when the plugin is destroyed.
+     */
+    fun cleanup() {
+        android.util.Log.i(TAG, "Cleaning up resources")
+        stopInternal()
+        batteryMonitor?.unregister()
+        networkStatus?.unregister()
     }
 }

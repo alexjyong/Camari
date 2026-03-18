@@ -16,7 +16,9 @@ class MainActivity : BridgeActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // Cleanup streaming resources
+        // Note: Plugin resources will be cleaned up by garbage collection
+        // For proper cleanup, the plugin should be registered with Capacitor
+        android.util.Log.i("MainActivity", "Activity destroyed")
     }
 
     override fun onPause() {
