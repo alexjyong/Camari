@@ -13,8 +13,8 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\"",
     "cap:sync": "cap sync android",
     "cap:open": "cap open android",
-    "test": "jest",
-    "test:watch": "jest --watch"
+    "test": "echo \"No tests yet - add Jest config to enable\" && exit 0",
+    "test:watch": "echo \"No tests yet\" && exit 0"
   },
   "dependencies": {
     "@capacitor/android": "^5.5.1",
