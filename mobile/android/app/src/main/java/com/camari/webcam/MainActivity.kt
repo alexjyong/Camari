@@ -3,8 +3,10 @@ package com.camari.webcam
 import android.os.Bundle
 import android.view.WindowManager
 import com.getcapacitor.BridgeActivity
+import com.getcapacitor.Plugin
 
 class MainActivity : BridgeActivity() {
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -14,16 +16,22 @@ class MainActivity : BridgeActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // TODO: Cleanup streaming resources
+        // Cleanup streaming resources
     }
 
     override fun onPause() {
         super.onPause()
-        // TODO: Optionally pause streaming when app is backgrounded
+        // Optionally pause streaming when app is backgrounded
     }
 
     override fun onResume() {
         super.onResume()
-        // TODO: Optionally resume streaming when app returns to foreground
+        // Optionally resume streaming when app returns to foreground
+    }
+    
+    override fun load() {
+        // Register custom Capacitor plugins
+        registerPlugin(com.camari.streaming.CameraStreamPlugin::class.java)
+        super.load()
     }
 }

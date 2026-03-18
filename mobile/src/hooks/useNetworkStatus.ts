@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { CameraStream } from '@capacitor/camera-stream';
+import { CameraStream } from '../services/CameraStreamService';
 import { NetworkStatusState, DEFAULT_NETWORK_STATUS, getConnectionQuality } from '../types/network';
 
 interface UseNetworkStatusOptions {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { CameraStream } from '@capacitor/camera-stream';
+import { CameraStream } from '../services/CameraStreamService';
 
 interface UseBatteryOptions {
   /** Callback when battery becomes low */

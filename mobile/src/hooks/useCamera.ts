@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { CameraStream } from '@capacitor/camera-stream';
+import { CameraStream } from '../services/CameraStreamService';
 import { CameraType, DEFAULT_CAMERA_TYPE } from '../types/camera';
 
 interface UseCameraOptions {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { CameraStream } from '@capacitor/camera-stream';
+import { CameraStream } from '../services/CameraStreamService';
 import { StreamingSession, StreamingStatus } from '../types/streaming';
 import { CameraType } from '../types/camera';
 

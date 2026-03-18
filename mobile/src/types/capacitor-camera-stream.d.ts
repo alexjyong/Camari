@@ -1,44 +1,39 @@
 /**
  * Type declarations for the custom CameraStream Capacitor plugin.
- * This allows TypeScript to recognize the plugin imports.
  */
 
-declare module '@capacitor/camera-stream' {
-  export interface CameraStreamPlugin {
-    startStreaming(): Promise<StartStreamingResult>;
-    stopStreaming(): Promise<void>;
-    switchCamera(): Promise<SwitchCameraResult>;
-    getStatus(): Promise<GetStatusResult>;
-    addListener(eventName: string, listenerFunc: (...args: any[]) => any): Promise<PluginListenerHandle>;
-  }
+export interface CameraStreamPlugin {
+  startStreaming(): Promise<StartStreamingResult>;
+  stopStreaming(): Promise<void>;
+  switchCamera(): Promise<SwitchCameraResult>;
+  getStatus(): Promise<GetStatusResult>;
+  addListener(eventName: string, listenerFunc: (...args: any[]) => any): Promise<PluginListenerHandle>;
+}
 
-  export interface StartStreamingResult {
-    streamUrl: string;
-    ipAddress: string;
-    port: number;
-    networkSsid: string;
-    cameraType: 'front' | 'back';
-  }
+export interface StartStreamingResult {
+  streamUrl: string;
+  ipAddress: string;
+  port: number;
+  networkSsid: string;
+  cameraType: 'front' | 'back';
+}
 
-  export interface SwitchCameraResult {
-    cameraType: 'front' | 'back';
-    success: boolean;
-  }
+export interface SwitchCameraResult {
+  cameraType: 'front' | 'back';
+  success: boolean;
+}
 
-  export interface GetStatusResult {
-    status: 'idle' | 'starting' | 'streaming' | 'reconnecting' | 'stopped' | 'error';
-    cameraType: 'front' | 'back' | null;
-    batteryLevel: number;
-    isCharging: boolean;
-    isLowBattery: boolean;
-    networkSsid: string | null;
-    ipAddress: string | null;
-    errorMessage?: string;
-  }
+export interface GetStatusResult {
+  status: 'idle' | 'starting' | 'streaming' | 'reconnecting' | 'stopped' | 'error';
+  cameraType: 'front' | 'back' | null;
+  batteryLevel: number;
+  isCharging: boolean;
+  isLowBattery: boolean;
+  networkSsid: string | null;
+  ipAddress: string | null;
+  errorMessage?: string;
+}
 
-  export interface PluginListenerHandle {
-    remove: () => void;
-  }
-
-  export const CameraStream: CameraStreamPlugin;
+export interface PluginListenerHandle {
+  remove: () => void;
 }
