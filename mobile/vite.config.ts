@@ -6,6 +6,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    rollupOptions: {
+      external: ['@capacitor/camera-stream'],
+    },
   },
   server: {
     port: 3000,

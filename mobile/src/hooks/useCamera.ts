@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { CameraStream } from '@capacitor/camera-stream';
 import { CameraType, DEFAULT_CAMERA_TYPE } from '../types/camera';
 

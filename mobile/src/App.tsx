@@ -40,7 +40,7 @@ function App() {
     },
   });
 
-  const { batteryLevel, isCharging } = useBattery({
+  const { level: batteryLevel, isCharging } = useBattery({
     onLowBattery: (level) => {
       console.log('Low battery:', level, '%');
     },

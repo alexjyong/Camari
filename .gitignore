@@ -11,28 +11,27 @@ build/
 .env
 .env.local
 .env.*.local
+package-lock.json
 
-# Capacitor
-mobile/node_modules/
-mobile/dist/
-mobile/build/
+# Capacitor (generated on sync)
+mobile/android/app/src/main/assets/
+mobile/android/app/capacitor.build.gradle
+mobile/android/capacitor-cordova-android-plugins/
+mobile/android/capacitor.settings.gradle
+mobile/android/app/src/main/res/xml/config.xml
+
+# Gradle wrapper (JAR is downloaded, properties file is kept)
+mobile/android/gradle/wrapper/gradle-wrapper.jar
+
+# Android build outputs
+mobile/android/app/build/
 mobile/android/.gradle/
 mobile/android/build/
-mobile/android/app/build/
-mobile/android/app/.externalNativeBuild/
-mobile/android/app/.cxx/
-mobile/android/.idea/
-*.iml
-
-# Android
-*.class
-*.jar
 *.apk
 *.aab
+*.ap_
 *.dex
-*.so
-.DS_Store
-Thumbs.db
+*.class
 
 # IDE
 .idea/
@@ -40,6 +39,7 @@ Thumbs.db
 *.swp
 *.swo
 *~
+*.iml
 
 # OS
 .DS_Store

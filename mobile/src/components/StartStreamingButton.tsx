@@ -1,4 +1,3 @@
-import React from 'react';
 import './StartStreamingButton.css';
 
 interface StartStreamingButtonProps {

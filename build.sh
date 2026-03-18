@@ -20,14 +20,23 @@ cd mobile
 echo "=== Installing npm dependencies ==="
 npm install
 
+echo "=== Running tests ==="
+npm test
+
 echo "=== Building TypeScript/React app ==="
 npm run build
 
 echo "=== Syncing Capacitor to Android ==="
 npx cap sync android
 
-echo "=== Building debug APK ==="
+echo "=== Generating Gradle wrapper (if missing) ==="
 cd android
+if [ ! -f "gradlew" ]; then
+  echo "Generating Gradle wrapper..."
+  gradle wrapper || echo "Warning: Could not generate wrapper, trying to continue..."
+fi
+
+echo "=== Building debug APK ==="
 ./gradlew assembleDebug
 
 echo ""
