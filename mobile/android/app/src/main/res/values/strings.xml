@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Camari</string>
+    <string name="start_streaming">Start Streaming</string>
+    <string name="stop_streaming">Stop Streaming</string>
+    <string name="camera_permission_required">Camera permission is required to stream video</string>
+    <string name="network_warning">Make sure your phone and computer are on the same WiFi network</string>
+    <string name="battery_low_warning">Battery low - recommend plugging in device</string>
+    <string name="reconnecting">Reconnecting...</string>
+    <string name="obs_browser_source_url">OBS Browser Source URL:</string>
+    <string name="copy_url">Copy URL</string>
+    <string name="url_copied">URL copied to clipboard</string>
+    <string name="streaming">Streaming</string>
+    <string name="error_camera_unavailable">Camera is unavailable. Close other apps using the camera.</string>
+    <string name="error_network_failed">Network connection lost</string>
+</resources>

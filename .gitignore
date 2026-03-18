@@ -1,0 +1,46 @@
+# Specify framework
+.specify/
+.qwen/
+specs/
+
+# Node.js / TypeScript
+node_modules/
+dist/
+build/
+*.log
+.env
+.env.local
+.env.*.local
+
+# Capacitor
+mobile/node_modules/
+mobile/dist/
+mobile/build/
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/app/.externalNativeBuild/
+mobile/android/app/.cxx/
+mobile/android/.idea/
+*.iml
+
+# Android
+*.class
+*.jar
+*.apk
+*.aab
+*.dex
+*.so
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
