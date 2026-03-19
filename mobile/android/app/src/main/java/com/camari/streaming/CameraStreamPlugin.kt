@@ -181,6 +181,14 @@ class CameraStreamPlugin : Plugin() {
     }
 
     @PluginMethod
+    fun setOrientation(call: PluginCall) {
+        val degrees = call.getInt("degrees") ?: 0
+        cameraManager?.setOrientation(degrees)
+        android.util.Log.i(TAG, "Orientation set to ${degrees}°")
+        call.resolve()
+    }
+
+    @PluginMethod
     fun getStatus(call: PluginCall) {
         try {
             val result = JSObject()

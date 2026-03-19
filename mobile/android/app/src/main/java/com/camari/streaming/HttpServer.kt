@@ -1,374 +1,239 @@
 package com.camari.streaming
 
 import android.util.Log
+import java.io.BufferedOutputStream
 import java.io.IOException
+import java.io.InputStream
 import java.io.OutputStream
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Simple HTTP server that streams MJPEG video to OBS browser sources.
- * 
+ *
  * Supports:
  * - GET /stream - MJPEG video stream (multipart/x-mixed-replace)
  * - GET /status - JSON status endpoint
+ * - GET /health - Health check
+ * - GET /     - Info page
  */
 class HttpServer(
     private val port: Int,
     private val cameraManager: CameraManager
 ) {
     private var serverSocket: ServerSocket? = null
-    private var isRunning = AtomicBoolean(false)
-    private var clientSocket: Socket? = null
-    private var streamThread: Thread? = null
-    
+    private val isRunning = AtomicBoolean(false)
+    private val clientSocket = AtomicReference<Socket?>(null)
+
     companion object {
         private const val TAG = "HttpServer"
         private const val BOUNDARY = "frame"
         private const val MIME_TYPE = "multipart/x-mixed-replace; boundary=$BOUNDARY"
+        private const val TARGET_FRAME_MS = 1000L / 30 // ~33ms per frame at 30fps
     }
 
-    /**
-     * Start the HTTP server on the specified port.
-     * Binds to all network interfaces (0.0.0.0) to allow connections from WebView and host.
-     */
     fun start() {
         if (isRunning.get()) {
             Log.w(TAG, "Server already running")
             return
         }
 
-        // First, try to clean up any existing server socket
-        stop()
-        
         try {
-            // Allow socket reuse to prevent EADDRINUSE
-            val serverSocketTemp = ServerSocket()
-            serverSocketTemp.reuseAddress = true
-            serverSocketTemp.bind(java.net.InetSocketAddress(port), 1)
-            serverSocketTemp.close()
-            
-            // Small delay to ensure port is fully released
-            Thread.sleep(100)
-            
-            // Force IPv4 stack for compatibility
-            System.setProperty("java.net.preferIPv4Stack", "true")
-            
-            // Bind to ALL interfaces (0.0.0.0) - this is critical for external access
-            serverSocket = ServerSocket(port)
-            serverSocket?.reuseAddress = true
+            val ss = ServerSocket()
+            ss.reuseAddress = true
+            ss.bind(java.net.InetSocketAddress("0.0.0.0", port))
+            serverSocket = ss
             isRunning.set(true)
-            
-            // Log all possible access URLs
-            val bindAddress = serverSocket?.inetAddress
-            Log.i(TAG, "===========================================")
-            Log.i(TAG, "HTTP SERVER STARTED")
-            Log.i(TAG, "Bound to: ${bindAddress?.hostAddress ?: "0.0.0.0"}:$port")
-            Log.i(TAG, "java.net.preferIPv4Stack: ${System.getProperty("java.net.preferIPv4Stack")}")
-            Log.i(TAG, "Access URLs:")
-            Log.i(TAG, "  - From WebView: http://localhost:$port/stream")
-            Log.i(TAG, "  - From host (emulator): http://10.0.2.2:$port/stream")
-            Log.i(TAG, "  - From network: http://<device-ip>:$port/stream")
-            Log.i(TAG, "===========================================")
 
-            // Start accepting connections in background thread
+            Log.i(TAG, "HTTP SERVER STARTED on port $port")
+
             Thread {
                 acceptConnections()
             }.apply {
                 isDaemon = true
-                name = "HttpServer-Thread"
+                name = "HttpServer-Accept"
                 start()
             }
-
         } catch (e: IOException) {
             Log.e(TAG, "Failed to start HTTP server on port $port: ${e.message}", e)
             throw RuntimeException("Failed to start HTTP server: ${e.message}")
         }
     }
 
-    /**
-     * Stop the HTTP server and close all connections.
-     */
     fun stop() {
         Log.i(TAG, "Stopping HTTP server...")
-        
         isRunning.set(false)
-        
-        // Close client connection
-        try {
-            clientSocket?.close()
-            clientSocket = null
-            Log.i(TAG, "Client connection closed")
-        } catch (e: IOException) {
-            Log.w(TAG, "Error closing client socket", e)
-        }
-        
-        // Close server socket
-        try {
-            serverSocket?.close()
-            serverSocket = null
-            Log.i(TAG, "Server socket closed")
-        } catch (e: IOException) {
-            Log.w(TAG, "Error closing server socket", e)
-        }
-        
+
+        try { clientSocket.getAndSet(null)?.close() } catch (e: IOException) { /* ignore */ }
+        try { serverSocket?.close(); serverSocket = null } catch (e: IOException) { /* ignore */ }
+
         Log.i(TAG, "HTTP server stopped")
     }
 
-    /**
-     * Accept incoming HTTP connections.
-     */
     private fun acceptConnections() {
-        Log.i(TAG, "Server accepting connections on port $port...")
-        
+        Log.i(TAG, "Accepting connections on port $port...")
         while (isRunning.get()) {
             try {
                 val socket = serverSocket?.accept() ?: continue
-                val clientAddress = socket.inetAddress.hostAddress
-                Log.i(TAG, "===========================================")
-                Log.i(TAG, "NEW CONNECTION ACCEPTED")
-                Log.i(TAG, "Client: $clientAddress")
-                Log.i(TAG, "Local: ${socket.localAddress.hostAddress}:${socket.localPort}")
-                Log.i(TAG, "===========================================")
-                handleConnection(socket)
-            } catch (e: IOException) {
-                if (isRunning.get()) {
-                    Log.e(TAG, "Error accepting connection", e)
-                } else {
-                    Log.d(TAG, "Server stopped, exiting accept loop")
+                Log.i(TAG, "Connection from ${socket.inetAddress.hostAddress}")
+                Thread {
+                    handleConnection(socket)
+                }.apply {
+                    isDaemon = true
+                    name = "HttpServer-Conn"
+                    start()
                 }
+            } catch (e: IOException) {
+                if (isRunning.get()) Log.e(TAG, "Accept error: ${e.message}")
             }
         }
-        
         Log.i(TAG, "Accept loop exited")
     }
 
-    /**
-     * Handle an incoming HTTP connection.
-     */
     private fun handleConnection(socket: Socket) {
-        Log.i(TAG, "=== HANDLE CONNECTION START ===")
-        Log.i(TAG, "Socket: $socket")
-        
         try {
-            val inputStream = socket.getInputStream()
-            val outputStream = socket.getOutputStream()
-            
-            Log.i(TAG, "Got input/output streams")
-            
-            // Read HTTP request with timeout
-            socket.soTimeout = 2000 // 2 second timeout
-            val reader = inputStream.bufferedReader()
-            val request = reader.readLine()
-            
-            Log.i(TAG, "Received request: '$request'")
-            
-            if (request.isNullOrBlank()) {
-                Log.w(TAG, "Empty request, closing connection")
+            // Disable Nagle's algorithm so small responses aren't held back
+            socket.tcpNoDelay = true
+            socket.soTimeout = 5000
+
+            val requestLine = readRequestLine(socket.getInputStream())
+            Log.i(TAG, "Request: '$requestLine'")
+
+            if (requestLine.isNullOrBlank()) {
                 socket.close()
                 return
             }
-            
-            // Route request
+
+            val out = BufferedOutputStream(socket.getOutputStream())
             when {
-                request.startsWith("GET /stream") -> {
-                    Log.i(TAG, "Routing to stream handler")
-                    handleStreamRequest(socket, outputStream)
-                }
-                request.startsWith("GET /status") -> {
-                    Log.i(TAG, "Routing to status handler")
-                    handleStatusRequest(outputStream)
-                    socket.close()
-                }
-                request.startsWith("GET /health") -> {
-                    Log.i(TAG, "Routing to health handler")
-                    handleHealthCheck(outputStream)
-                    socket.close()
-                }
-                request.startsWith("GET /") -> {
-                    Log.i(TAG, "Routing to root handler")
-                    handleRootRequest(outputStream)
-                    socket.close()
-                }
-                else -> {
-                    Log.w(TAG, "Unknown request: $request")
-                    handleNotFound(outputStream)
-                    socket.close()
-                }
+                requestLine.startsWith("GET /stream") -> handleStreamRequest(socket, out)
+                requestLine.startsWith("GET /status") -> { handleStatusRequest(out); socket.close() }
+                requestLine.startsWith("GET /health") -> { handleHealthCheck(out); socket.close() }
+                requestLine.startsWith("GET /")       -> { handleRootRequest(out); socket.close() }
+                else -> { handleNotFound(out); socket.close() }
             }
-            
         } catch (e: java.net.SocketTimeoutException) {
-            Log.w(TAG, "Socket timeout waiting for request")
-            try { socket.close() } catch (ex: Exception) {}
+            Log.w(TAG, "Timeout reading request from ${socket.inetAddress.hostAddress}")
+            try { socket.close() } catch (_: Exception) {}
         } catch (e: IOException) {
-            Log.w(TAG, "IO error: ${e.message}")
-            try { socket.close() } catch (ex: Exception) {}
+            Log.w(TAG, "IO error handling connection: ${e.message}")
+            try { socket.close() } catch (_: Exception) {}
         } catch (e: Exception) {
             Log.e(TAG, "Unexpected error: ${e.message}", e)
-            try { socket.close() } catch (ex: Exception) {}
+            try { socket.close() } catch (_: Exception) {}
         }
-        
-        Log.i(TAG, "=== HANDLE CONNECTION END ===")
     }
 
     /**
-     * Handle MJPEG stream request from OBS.
+     * Read the HTTP request line byte-by-byte to avoid BufferedReader consuming headers
+     * into its internal buffer and then blocking waiting for the request body.
      */
-    private fun handleStreamRequest(socket: Socket, outputStream: OutputStream) {
-        clientSocket = socket
-        
-        // Send HTTP response headers
-        val headers = buildString {
-            append("HTTP/1.1 200 OK\r\n")
-            append("Content-Type: $MIME_TYPE\r\n")
-            append("Cache-Control: no-cache\r\n")
-            append("Pragma: no-cache\r\n")
-            append("Expires: 0\r\n")
-            append("Connection: keep-alive\r\n")
-            append("\r\n")
+    private fun readRequestLine(input: InputStream): String? {
+        val sb = StringBuilder(128)
+        var prev = -1
+        while (true) {
+            val b = input.read()
+            if (b == -1) break
+            if (prev == '\r'.code && b == '\n'.code) {
+                // Strip trailing \r
+                if (sb.isNotEmpty()) sb.deleteCharAt(sb.length - 1)
+                break
+            }
+            sb.append(b.toChar())
+            prev = b
         }
-        
-        outputStream.write(headers.toByteArray())
-        outputStream.flush()
-        
-        Log.i(TAG, "Streaming started to ${socket.inetAddress.hostAddress}")
-        
-        // Stream frames continuously
+        return sb.toString().ifBlank { null }
+    }
+
+    private fun handleStreamRequest(socket: Socket, out: BufferedOutputStream) {
+        clientSocket.set(socket)
+
+        val headers = "HTTP/1.1 200 OK\r\n" +
+            "Content-Type: $MIME_TYPE\r\n" +
+            "Cache-Control: no-cache\r\n" +
+            "Pragma: no-cache\r\n" +
+            "Connection: keep-alive\r\n" +
+            "\r\n"
+        out.write(headers.toByteArray(Charsets.US_ASCII))
+        out.flush()
+
+        Log.i(TAG, "Streaming to ${socket.inetAddress.hostAddress}")
+
         var frameCount = 0
         try {
             while (isRunning.get() && !socket.isClosed) {
-                // Capture frame from camera
+                val frameStart = System.currentTimeMillis()
+
                 val jpegBytes = cameraManager.captureFrame() ?: continue
-                
-                // Send MJPEG frame
-                val frameHeader = buildString {
-                    append("--$BOUNDARY\r\n")
-                    append("Content-Type: image/jpeg\r\n")
-                    append("Content-Length: ${jpegBytes.size}\r\n")
-                    append("\r\n")
-                }
-                
-                outputStream.write(frameHeader.toByteArray())
-                outputStream.write(jpegBytes)
-                outputStream.write("\r\n".toByteArray())
-                outputStream.flush()
-                
+
+                val frameHeader = "--$BOUNDARY\r\n" +
+                    "Content-Type: image/jpeg\r\n" +
+                    "Content-Length: ${jpegBytes.size}\r\n" +
+                    "\r\n"
+                out.write(frameHeader.toByteArray(Charsets.US_ASCII))
+                out.write(jpegBytes)
+                out.write("\r\n".toByteArray(Charsets.US_ASCII))
+                out.flush()
+
                 frameCount++
                 if (frameCount % 30 == 0) {
-                    Log.d(TAG, "Sent $frameCount frames to ${socket.inetAddress.hostAddress}")
+                    Log.d(TAG, "Sent $frameCount frames")
                 }
+
+                // Pace frames to ~30fps
+                val elapsed = System.currentTimeMillis() - frameStart
+                val sleep = TARGET_FRAME_MS - elapsed
+                if (sleep > 0) Thread.sleep(sleep)
             }
         } catch (e: IOException) {
-            Log.w(TAG, "Stream interrupted after $frameCount frames", e)
+            Log.i(TAG, "Stream ended after $frameCount frames: ${e.message}")
         } finally {
-            Log.i(TAG, "Streaming stopped after $frameCount frames")
-            try {
-                socket.close()
-            } catch (ex: IOException) {
-                // Ignore
-            }
-            clientSocket = null
+            clientSocket.compareAndSet(socket, null)
+            try { socket.close() } catch (_: IOException) {}
+            Log.i(TAG, "Stream closed after $frameCount frames")
         }
     }
 
-    /**
-     * Handle status endpoint request.
-     */
-    private fun handleStatusRequest(outputStream: OutputStream) {
-        val status = if (isRunning.get() && cameraManager.isCameraOpen()) {
-            """{
-                "status": "streaming",
-                "camera": "${cameraManager.getCameraType()}",
-                "resolution": "1280x720",
-                "frameRate": 30,
-                "connectedClients": ${if (clientSocket != null) 1 else 0},
-                "uptime": ${System.currentTimeMillis() - cameraManager.getSessionStartTime()}
-            }"""
+    private fun handleStatusRequest(out: BufferedOutputStream) {
+        val body = if (cameraManager.isCameraOpen()) {
+            """{"status":"streaming","camera":"${cameraManager.getCameraType()}","resolution":"1280x720","frameRate":30,"connectedClients":${if (clientSocket.get() != null) 1 else 0},"uptime":${System.currentTimeMillis() - cameraManager.getSessionStartTime()}}"""
         } else {
-            """{
-                "status": "idle",
-                "camera": null,
-                "resolution": null,
-                "frameRate": null,
-                "connectedClients": 0,
-                "uptime": 0
-            }"""
+            """{"status":"idle","camera":null,"resolution":null,"frameRate":null,"connectedClients":0,"uptime":0}"""
         }
-        
-        val response = buildString {
-            append("HTTP/1.1 200 OK\r\n")
-            append("Content-Type: application/json\r\n")
-            append("Content-Length: ${status.length}\r\n")
-            append("\r\n")
-            append(status)
-        }
-        
-        outputStream.write(response.toByteArray())
-        outputStream.flush()
+        writeResponse(out, "200 OK", "application/json", body)
     }
 
-    /**
-     * Handle root endpoint - simple hello world.
-     */
-    private fun handleRootRequest(outputStream: OutputStream) {
-        val html = """
-            <!DOCTYPE html>
-            <html>
-            <head><title>Camari Webcam Server</title></head>
-            <body>
-                <h1>🎥 Camari Webcam Server</h1>
-                <p>Server is running!</p>
-                <ul>
-                    <li><a href="/stream">/stream</a> - MJPEG video stream (for OBS)</li>
-                    <li><a href="/health">/health</a> - Health check</li>
-                    <li><a href="/status">/status</a> - Server status</li>
-                </ul>
-            </body>
-            </html>
-        """.trimIndent()
-        
-        val response = buildString {
-            append("HTTP/1.1 200 OK\r\n")
-            append("Content-Type: text/html\r\n")
-            append("Content-Length: ${html.length}\r\n")
-            append("\r\n")
-            append(html)
-        }
-        
-        outputStream.write(response.toByteArray())
-        outputStream.flush()
-        Log.i(TAG, "Root request served")
+    private fun handleRootRequest(out: BufferedOutputStream) {
+        val body = """<!DOCTYPE html><html><head><title>Camari</title></head><body>
+<h1>Camari Webcam Server</h1><p>Server is running on port $port</p>
+<ul><li><a href="/stream">/stream</a> - MJPEG stream (paste into OBS)</li>
+<li><a href="/health">/health</a> - Health check</li>
+<li><a href="/status">/status</a> - Status JSON</li></ul>
+</body></html>"""
+        writeResponse(out, "200 OK", "text/html", body)
+        Log.i(TAG, "Root served")
     }
 
-    /**
-     * Handle health check endpoint.
-     */
-    private fun handleHealthCheck(outputStream: OutputStream) {
-        val response = buildString {
-            append("HTTP/1.1 200 OK\r\n")
-            append("Content-Type: text/plain\r\n")
-            append("\r\n")
-            append("OK - Server is running")
-        }
-        
-        outputStream.write(response.toByteArray())
-        outputStream.flush()
+    private fun handleHealthCheck(out: BufferedOutputStream) {
+        writeResponse(out, "200 OK", "text/plain", "OK")
         Log.i(TAG, "Health check served")
     }
 
-    /**
-     * Handle 404 Not Found.
-     */
-    private fun handleNotFound(outputStream: OutputStream) {
-        val response = buildString {
-            append("HTTP/1.1 404 Not Found\r\n")
-            append("Content-Type: text/plain\r\n")
-            append("\r\n")
-            append("Not Found")
-        }
-        
-        outputStream.write(response.toByteArray())
-        outputStream.flush()
+    private fun handleNotFound(out: BufferedOutputStream) {
+        writeResponse(out, "404 Not Found", "text/plain", "Not Found")
+    }
+
+    private fun writeResponse(out: BufferedOutputStream, status: String, contentType: String, body: String) {
+        val bodyBytes = body.toByteArray(Charsets.UTF_8)
+        val response = "HTTP/1.1 $status\r\n" +
+            "Content-Type: $contentType\r\n" +
+            "Content-Length: ${bodyBytes.size}\r\n" +
+            "Connection: close\r\n" +
+            "\r\n"
+        out.write(response.toByteArray(Charsets.US_ASCII))
+        out.write(bodyBytes)
+        out.flush()
     }
 }

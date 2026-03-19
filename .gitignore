@@ -1,6 +1,7 @@
 # Specify framework
 .specify/
 .qwen/
+.claude
 specs/
 
 # Node.js / TypeScript

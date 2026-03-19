@@ -26,6 +26,9 @@ export const CameraStream = registerPlugin<CameraStreamPlugin>('CameraStream', {
         console.log('[CameraStream.web] switchCamera (stub)');
         return { cameraType: 'back' as const, success: true };
       },
+      async setOrientation({ degrees }: { degrees: number }) {
+        console.log('[CameraStream.web] setOrientation (stub):', degrees);
+      },
       async getStatus() {
         return {
           status: 'idle' as const,

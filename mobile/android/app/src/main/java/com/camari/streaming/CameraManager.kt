@@ -1,147 +1,287 @@
 package com.camari.streaming
 
-import android.app.Activity
+import android.annotation.SuppressLint
+import android.content.Context
+import android.graphics.ImageFormat
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraCaptureSession
+import android.hardware.camera2.CameraDevice
+import android.hardware.camera2.CaptureRequest
+import android.media.ImageReader
+import android.os.Handler
+import android.os.HandlerThread
 import android.util.Log
+import android.util.Size
+import android.app.Activity
+import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Minimal camera manager stub - to be implemented properly later.
+ * Manages Camera2 API capture and delivers JPEG frames to the HTTP server.
+ *
+ * Design:
+ * - Camera2 captures continuously via setRepeatingRequest into an ImageReader (JPEG format).
+ * - Each new frame is stored in [latestFrame] (AtomicReference).
+ * - [captureFrame] is called by the HTTP server thread and reads the latest frame.
+ * - Front camera is default; [setCameraType] restarts the session with the other camera.
  */
 class CameraManager(private val activity: Activity) {
 
     private var currentCameraType = "front"
     private var sessionStartTime = 0L
-    private var isCameraOpen = false
+    private var cameraOpen = false
+
+    private val systemCameraManager =
+        activity.getSystemService(Context.CAMERA_SERVICE) as android.hardware.camera2.CameraManager
+
+    private var cameraDevice: CameraDevice? = null
+    private var captureSession: CameraCaptureSession? = null
+    private var imageReader: ImageReader? = null
+
+    private var cameraThread: HandlerThread? = null
+    private var cameraHandler: Handler? = null
+
+    // Latest JPEG frame — written by camera thread, read by HTTP server thread
+    private val latestFrame = AtomicReference<ByteArray?>(null)
+
+    // Guards against concurrent startCamera calls (e.g. during camera switch)
+    private val openLock = Semaphore(1)
+
+    // Degrees the raw JPEG output must be rotated CW to appear upright (from SENSOR_ORIENTATION)
+    private var sensorOrientation = 0
+
+    // Additional CW rotation selected by the user (0, 90, 180, 270)
+    @Volatile private var userRotationDegrees = 0
 
     companion object {
         private const val TAG = "CameraManager"
-        
-        // Minimal valid 1x1 red pixel JPEG
-        private val PLACEHOLDER_JPEG = byteArrayOf(
-            0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), // SOI, APP0
-            0x00.toByte(), 0x10.toByte(), 0x4A.toByte(), 0x46.toByte(), // JFIF
-            0x49.toByte(), 0x46.toByte(), 0x00.toByte(), 0x01.toByte(),
-            0x01.toByte(), 0x00.toByte(), 0x00.toByte(), 0x01.toByte(),
-            0x00.toByte(), 0x01.toByte(), 0x00.toByte(), 0x00.toByte(),
-            0xFF.toByte(), 0xDB.toByte(), 0x00.toByte(), 0x43.toByte(), // DQT
-            0x00.toByte(), 0x08.toByte(), 0x06.toByte(), 0x06.toByte(),
-            0x07.toByte(), 0x06.toByte(), 0x05.toByte(), 0x08.toByte(),
-            0x07.toByte(), 0x07.toByte(), 0x07.toByte(), 0x09.toByte(),
-            0x09.toByte(), 0x08.toByte(), 0x0A.toByte(), 0x0C.toByte(),
-            0x14.toByte(), 0x0D.toByte(), 0x0C.toByte(), 0x0B.toByte(),
-            0x0B.toByte(), 0x0C.toByte(), 0x19.toByte(), 0x12.toByte(),
-            0x13.toByte(), 0x0F.toByte(), 0x14.toByte(), 0x1D.toByte(),
-            0x1A.toByte(), 0x1F.toByte(), 0x1E.toByte(), 0x1D.toByte(),
-            0x1A.toByte(), 0x1C.toByte(), 0x1C.toByte(), 0x20.toByte(),
-            0x24.toByte(), 0x2E.toByte(), 0x27.toByte(), 0x20.toByte(),
-            0x22.toByte(), 0x2C.toByte(), 0x23.toByte(), 0x1C.toByte(),
-            0x1C.toByte(), 0x28.toByte(), 0x37.toByte(), 0x29.toByte(),
-            0x2C.toByte(), 0x30.toByte(), 0x31.toByte(), 0x34.toByte(),
-            0x34.toByte(), 0x34.toByte(), 0x1F.toByte(), 0x27.toByte(),
-            0x39.toByte(), 0x3D.toByte(), 0x38.toByte(), 0x32.toByte(),
-            0x3C.toByte(), 0x2E.toByte(), 0x33.toByte(), 0x34.toByte(),
-            0x32.toByte(), 0xFF.toByte(), 0xC0.toByte(), 0x00.toByte(), // SOF0
-            0x0B.toByte(), 0x08.toByte(), 0x00.toByte(), 0x01.toByte(), // 1x1
-            0x00.toByte(), 0x01.toByte(), 0x01.toByte(), 0x01.toByte(),
-            0x11.toByte(), 0x00.toByte(), 0xFF.toByte(), 0xC4.toByte(), // DHT
-            0x00.toByte(), 0x1F.toByte(), 0x00.toByte(), 0x00.toByte(),
-            0x01.toByte(), 0x05.toByte(), 0x01.toByte(), 0x01.toByte(),
-            0x01.toByte(), 0x01.toByte(), 0x01.toByte(), 0x01.toByte(),
-            0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(),
-            0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(),
-            0x01.toByte(), 0x02.toByte(), 0x03.toByte(), 0x04.toByte(),
-            0x05.toByte(), 0x06.toByte(), 0x07.toByte(), 0x08.toByte(),
-            0x09.toByte(), 0x0A.toByte(), 0x0B.toByte(), 0xFF.toByte(),
-            0xC4.toByte(), 0x00.toByte(), 0xB5.toByte(), 0x10.toByte(),
-            0x00.toByte(), 0x02.toByte(), 0x01.toByte(), 0x03.toByte(),
-            0x03.toByte(), 0x02.toByte(), 0x04.toByte(), 0x03.toByte(),
-            0x05.toByte(), 0x05.toByte(), 0x04.toByte(), 0x04.toByte(),
-            0x00.toByte(), 0x00.toByte(), 0x01.toByte(), 0x7D.toByte(),
-            0x01.toByte(), 0x02.toByte(), 0x03.toByte(), 0x00.toByte(),
-            0x04.toByte(), 0x11.toByte(), 0x05.toByte(), 0x12.toByte(),
-            0x21.toByte(), 0x31.toByte(), 0x41.toByte(), 0x06.toByte(),
-            0x13.toByte(), 0x51.toByte(), 0x61.toByte(), 0x07.toByte(),
-            0x22.toByte(), 0x71.toByte(), 0x14.toByte(), 0x32.toByte(),
-            0x81.toByte(), 0x91.toByte(), 0xA1.toByte(), 0x08.toByte(),
-            0x23.toByte(), 0x42.toByte(), 0xB1.toByte(), 0xC1.toByte(),
-            0x15.toByte(), 0x52.toByte(), 0xD1.toByte(), 0xF0.toByte(),
-            0x24.toByte(), 0x33.toByte(), 0x62.toByte(), 0x72.toByte(),
-            0x82.toByte(), 0x09.toByte(), 0x0A.toByte(), 0x16.toByte(),
-            0x17.toByte(), 0x18.toByte(), 0x19.toByte(), 0x1A.toByte(),
-            0x25.toByte(), 0x26.toByte(), 0x27.toByte(), 0x28.toByte(),
-            0x29.toByte(), 0x2A.toByte(), 0x34.toByte(), 0x35.toByte(),
-            0x36.toByte(), 0x37.toByte(), 0x38.toByte(), 0x39.toByte(),
-            0x3A.toByte(), 0x43.toByte(), 0x44.toByte(), 0x45.toByte(),
-            0x46.toByte(), 0x47.toByte(), 0x48.toByte(), 0x49.toByte(),
-            0x4A.toByte(), 0x53.toByte(), 0x54.toByte(), 0x55.toByte(),
-            0x56.toByte(), 0x57.toByte(), 0x58.toByte(), 0x59.toByte(),
-            0x5A.toByte(), 0x63.toByte(), 0x64.toByte(), 0x65.toByte(),
-            0x66.toByte(), 0x67.toByte(), 0x68.toByte(), 0x69.toByte(),
-            0x6A.toByte(), 0x73.toByte(), 0x74.toByte(), 0x75.toByte(),
-            0x76.toByte(), 0x77.toByte(), 0x78.toByte(), 0x79.toByte(),
-            0x7A.toByte(), 0x83.toByte(), 0x84.toByte(), 0x85.toByte(),
-            0x86.toByte(), 0x87.toByte(), 0x88.toByte(), 0x89.toByte(),
-            0x8A.toByte(), 0x92.toByte(), 0x93.toByte(), 0x94.toByte(),
-            0x95.toByte(), 0x96.toByte(), 0x97.toByte(), 0x98.toByte(),
-            0x99.toByte(), 0x9A.toByte(), 0xA2.toByte(), 0xA3.toByte(),
-            0xA4.toByte(), 0xA5.toByte(), 0xA6.toByte(), 0xA7.toByte(),
-            0xA8.toByte(), 0xA9.toByte(), 0xAA.toByte(), 0xB2.toByte(),
-            0xB3.toByte(), 0xB4.toByte(), 0xB5.toByte(), 0xB6.toByte(),
-            0xB7.toByte(), 0xB8.toByte(), 0xB9.toByte(), 0xBA.toByte(),
-            0xC2.toByte(), 0xC3.toByte(), 0xC4.toByte(), 0xC5.toByte(),
-            0xC6.toByte(), 0xC7.toByte(), 0xC8.toByte(), 0xC9.toByte(),
-            0xCA.toByte(), 0xD2.toByte(), 0xD3.toByte(), 0xD4.toByte(),
-            0xD5.toByte(), 0xD6.toByte(), 0xD7.toByte(), 0xD8.toByte(),
-            0xD9.toByte(), 0xDA.toByte(), 0xE1.toByte(), 0xE2.toByte(),
-            0xE3.toByte(), 0xE4.toByte(), 0xE5.toByte(), 0xE6.toByte(),
-            0xE7.toByte(), 0xE8.toByte(), 0xE9.toByte(), 0xEA.toByte(),
-            0xEB.toByte(), 0xF1.toByte(), 0xF2.toByte(), 0xF3.toByte(),
-            0xF4.toByte(), 0xF5.toByte(), 0xF6.toByte(), 0xF7.toByte(),
-            0xF8.toByte(), 0xF9.toByte(), 0xFA.toByte(), 0xFF.toByte(),
-            0xDA.toByte(), 0x00.toByte(), 0x08.toByte(), 0x01.toByte(), // SOS
-            0x01.toByte(), 0x00.toByte(), 0x00.toByte(), 0x3F.toByte(),
-            0x00.toByte(), 0xFB.toByte(), 0xD5.toByte(), 0xDB.toByte(),
-            0x20.toByte(), 0xA8.toByte(), 0xF1.toByte(), 0x80.toByte(),
-            0x0A.toByte(), 0x28.toByte(), 0xA0.toByte(), 0x02.toByte(),
-            0x80.toByte(), 0x0A.toByte(), 0x00.toByte(), 0x00.toByte(),
-            0xFF.toByte(), 0xD9.toByte()  // EOI
-        )
+        private const val TARGET_WIDTH = 1280
+        private const val TARGET_HEIGHT = 720
+        private const val JPEG_QUALITY: Byte = 85
     }
 
     fun setCameraType(type: String) {
+        if (currentCameraType == type) return
         currentCameraType = type
-        Log.i(TAG, "Camera type set to: $type")
+        Log.i(TAG, "Switching to $type camera")
+        if (cameraOpen) {
+            stopCamera()
+            startCamera()
+        }
     }
 
-    fun getCameraType(): String {
-        return currentCameraType
+    fun getCameraType(): String = currentCameraType
+
+    /**
+     * Set additional CW rotation on top of sensor auto-correction.
+     * degrees: 0 = upright portrait, 90 = landscape-left, 180 = portrait-flipped, 270 = landscape-right
+     */
+    fun setOrientation(degrees: Int) {
+        userRotationDegrees = ((degrees % 360) + 360) % 360
+        Log.i(TAG, "User rotation set to ${userRotationDegrees}°")
     }
 
-    fun isCameraOpen(): Boolean {
-        return isCameraOpen
-    }
+    fun isCameraOpen(): Boolean = cameraOpen
 
-    fun getSessionStartTime(): Long {
-        return sessionStartTime
-    }
+    fun getSessionStartTime(): Long = sessionStartTime
 
     fun startCamera() {
-        Log.i(TAG, "Camera started (stub)")
-        isCameraOpen = true
-        sessionStartTime = System.currentTimeMillis()
+        if (!openLock.tryAcquire(2, TimeUnit.SECONDS)) {
+            Log.e(TAG, "Timeout acquiring camera lock")
+            return
+        }
+        try {
+            startCameraThread()
+            val cameraId = findCameraId(currentCameraType)
+            if (cameraId == null) {
+                Log.e(TAG, "No $currentCameraType camera found on this device")
+                stopCameraThread()
+                return
+            }
+            val size = chooseBestSize(cameraId)
+            sensorOrientation = systemCameraManager.getCameraCharacteristics(cameraId)
+                .get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
+            Log.i(TAG, "Opening $currentCameraType camera ($cameraId) at ${size.width}x${size.height}, sensor=${sensorOrientation}°")
+            openCamera(cameraId, size)
+            sessionStartTime = System.currentTimeMillis()
+            cameraOpen = true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start camera: ${e.message}", e)
+            cameraOpen = false
+            stopCameraThread()
+        } finally {
+            openLock.release()
+        }
     }
 
     fun stopCamera() {
+        Log.i(TAG, "Stopping camera...")
+        cameraOpen = false
+        latestFrame.set(null)
+        try { captureSession?.close() } catch (e: Exception) { Log.w(TAG, "Session close: ${e.message}") }
+        try { cameraDevice?.close() } catch (e: Exception) { Log.w(TAG, "Device close: ${e.message}") }
+        try { imageReader?.close() } catch (e: Exception) { Log.w(TAG, "ImageReader close: ${e.message}") }
+        captureSession = null
+        cameraDevice = null
+        imageReader = null
+        stopCameraThread()
         Log.i(TAG, "Camera stopped")
-        isCameraOpen = false
     }
 
-    fun release() {
-        stopCamera()
-    }
+    fun release() = stopCamera()
 
+    /**
+     * Returns the latest JPEG frame rotated to the correct orientation, or null if not ready.
+     *
+     * Total rotation = sensorOrientation (auto-corrects physical sensor mounting angle)
+     *                + userRotationDegrees (user preference on top)
+     */
     fun captureFrame(): ByteArray? {
-        // Return a simple placeholder frame (1x1 pixel red JPEG)
-        // This is a minimal valid JPEG that browsers/OBS can display
-        return PLACEHOLDER_JPEG
+        val jpeg = latestFrame.get() ?: return null
+        val totalRotation = (sensorOrientation + userRotationDegrees) % 360
+        return if (totalRotation == 0) jpeg else rotateJpeg(jpeg, totalRotation)
+    }
+
+    private fun rotateJpeg(jpeg: ByteArray, degrees: Int): ByteArray {
+        val bitmap = android.graphics.BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size)
+            ?: return jpeg
+        val matrix = android.graphics.Matrix().apply { postRotate(degrees.toFloat()) }
+        val rotated = android.graphics.Bitmap.createBitmap(
+            bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true
+        )
+        bitmap.recycle()
+        val out = java.io.ByteArrayOutputStream()
+        rotated.compress(android.graphics.Bitmap.CompressFormat.JPEG, JPEG_QUALITY.toInt(), out)
+        rotated.recycle()
+        return out.toByteArray()
+    }
+
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    private fun findCameraId(type: String): String? {
+        val facing = if (type == "front") CameraCharacteristics.LENS_FACING_FRONT
+                     else CameraCharacteristics.LENS_FACING_BACK
+        return systemCameraManager.cameraIdList.firstOrNull { id ->
+            systemCameraManager.getCameraCharacteristics(id)
+                .get(CameraCharacteristics.LENS_FACING) == facing
+        }
+    }
+
+    /**
+     * Find the best JPEG output size ≤ 720p.
+     * Prefers 1280x720 exactly, otherwise largest size that fits within the target.
+     */
+    private fun chooseBestSize(cameraId: String): Size {
+        val map = systemCameraManager.getCameraCharacteristics(cameraId)
+            .get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)!!
+        val sizes = map.getOutputSizes(ImageFormat.JPEG)
+
+        // Exact match first
+        sizes.firstOrNull { it.width == TARGET_WIDTH && it.height == TARGET_HEIGHT }
+            ?.let { return it }
+
+        // Largest size that fits within our target
+        sizes.filter { it.width <= TARGET_WIDTH && it.height <= TARGET_HEIGHT }
+            .maxByOrNull { it.width * it.height }
+            ?.let { return it }
+
+        // Fallback: closest by area
+        return sizes.minByOrNull {
+            val dw = (it.width - TARGET_WIDTH).toLong()
+            val dh = (it.height - TARGET_HEIGHT).toLong()
+            dw * dw + dh * dh
+        } ?: Size(TARGET_WIDTH, TARGET_HEIGHT)
+    }
+
+    @SuppressLint("MissingPermission") // Permission is checked by CameraStreamPlugin before calling startCamera()
+    private fun openCamera(cameraId: String, size: Size) {
+        imageReader = ImageReader.newInstance(size.width, size.height, ImageFormat.JPEG, 2).apply {
+            setOnImageAvailableListener({ reader ->
+                val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
+                try {
+                    val buffer = image.planes[0].buffer
+                    val bytes = ByteArray(buffer.remaining())
+                    buffer.get(bytes)
+                    latestFrame.set(bytes)
+                } finally {
+                    image.close()
+                }
+            }, cameraHandler)
+        }
+
+        systemCameraManager.openCamera(cameraId, object : CameraDevice.StateCallback() {
+            override fun onOpened(device: CameraDevice) {
+                Log.i(TAG, "Camera opened: $cameraId")
+                cameraDevice = device
+                createCaptureSession(device)
+            }
+
+            override fun onDisconnected(device: CameraDevice) {
+                Log.w(TAG, "Camera disconnected")
+                device.close()
+                cameraDevice = null
+                cameraOpen = false
+            }
+
+            override fun onError(device: CameraDevice, error: Int) {
+                Log.e(TAG, "Camera error $error on $cameraId")
+                device.close()
+                cameraDevice = null
+                cameraOpen = false
+            }
+        }, cameraHandler)
+    }
+
+    @Suppress("DEPRECATION") // createCaptureSession(List, StateCallback, Handler) deprecated in API 30
+    private fun createCaptureSession(device: CameraDevice) {
+        val surface = imageReader!!.surface
+        device.createCaptureSession(
+            listOf(surface),
+            object : CameraCaptureSession.StateCallback() {
+                override fun onConfigured(session: CameraCaptureSession) {
+                    captureSession = session
+                    startRepeatingCapture(session, device, surface)
+                }
+
+                override fun onConfigureFailed(session: CameraCaptureSession) {
+                    Log.e(TAG, "Capture session configuration failed")
+                    cameraOpen = false
+                }
+            },
+            cameraHandler
+        )
+    }
+
+    private fun startRepeatingCapture(
+        session: CameraCaptureSession,
+        device: CameraDevice,
+        surface: android.view.Surface
+    ) {
+        val request = device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
+            addTarget(surface)
+            set(CaptureRequest.JPEG_QUALITY, JPEG_QUALITY)
+            set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
+            set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+            set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_AUTO)
+        }
+        session.setRepeatingRequest(request.build(), null, cameraHandler)
+        Log.i(TAG, "Repeating capture started")
+    }
+
+    private fun startCameraThread() {
+        cameraThread = HandlerThread("CameraManager-Thread").also {
+            it.start()
+            cameraHandler = Handler(it.looper)
+        }
+    }
+
+    private fun stopCameraThread() {
+        cameraThread?.quitSafely()
+        try { cameraThread?.join(1000) } catch (_: InterruptedException) {}
+        cameraThread = null
+        cameraHandler = null
     }
 }

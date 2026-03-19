@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useStreaming, useBattery, useCamera } from './hooks';
-import { 
-  StartStreamingButton, 
-  StreamUrlDisplay, 
+import {
+  StartStreamingButton,
+  StreamUrlDisplay,
   CameraSwitchButton,
   StreamingIndicator,
   BatteryWarning,
@@ -95,7 +95,7 @@ function App() {
               ipAddress={session?.ipAddress}
             />
 
-            <CameraSwitchButton 
+            <CameraSwitchButton
               onSwitch={switchCamera}
               currentCamera={cameraType}
               isSwitching={isSwitching}
