@@ -39,9 +39,22 @@ class HttpServer(
             return
         }
 
+        // First, try to clean up any existing server socket
+        stop()
+        
         try {
+            // Allow socket reuse to prevent EADDRINUSE
+            val serverSocketTemp = ServerSocket()
+            serverSocketTemp.reuseAddress = true
+            serverSocketTemp.bind(java.net.InetSocketAddress(port), 1)
+            serverSocketTemp.close()
+            
+            // Small delay to ensure port is fully released
+            Thread.sleep(100)
+            
             // Bind to all interfaces (0.0.0.0) to allow WebView connections
             serverSocket = ServerSocket(port)
+            serverSocket?.reuseAddress = true
             isRunning.set(true)
             
             val localAddress = serverSocket?.inetAddress?.hostAddress ?: "0.0.0.0"
@@ -58,7 +71,7 @@ class HttpServer(
             }
 
         } catch (e: IOException) {
-            Log.e(TAG, "Failed to start HTTP server on port $port", e)
+            Log.e(TAG, "Failed to start HTTP server on port $port: ${e.message}", e)
             throw RuntimeException("Failed to start HTTP server: ${e.message}")
         }
     }

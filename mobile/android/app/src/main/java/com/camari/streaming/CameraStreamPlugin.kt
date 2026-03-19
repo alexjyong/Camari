@@ -70,14 +70,34 @@ class CameraStreamPlugin : Plugin() {
             cameraManager?.setCameraType(currentCameraType)
             cameraManager?.startCamera()
             
-            // Initialize and start HTTP server
-            httpServer = HttpServer(DEFAULT_PORT, cameraManager!!)
-            httpServer?.start()
+            // Initialize and start HTTP server, trying multiple ports if needed
+            val portsToTry = listOf(DEFAULT_PORT, 8081, 8082, 8083)
+            var serverStarted = false
+            var actualPort = DEFAULT_PORT
+            
+            for (port in portsToTry) {
+                try {
+                    httpServer = HttpServer(port, cameraManager!!)
+                    httpServer?.start()
+                    actualPort = port
+                    serverStarted = true
+                    android.util.Log.i(TAG, "Server started on port $port")
+                    break
+                } catch (e: Exception) {
+                    android.util.Log.w(TAG, "Failed to start on port $port: ${e.message}")
+                    httpServer = null
+                    // Try next port
+                }
+            }
+            
+            if (!serverStarted) {
+                throw RuntimeException("Could not start server on any port")
+            }
             
             // Get network info
             val ipAddress = networkStatus?.getIpAddress() ?: "192.168.1.100"
             val ssid = networkStatus?.getNetworkSsid() ?: "WiFi"
-            val streamUrl = "http://$ipAddress:$DEFAULT_PORT/stream"
+            val streamUrl = "http://$ipAddress:$actualPort/stream"
             
             android.util.Log.i(TAG, "Streaming started: $streamUrl")
             
@@ -85,7 +105,7 @@ class CameraStreamPlugin : Plugin() {
             val result = JSObject()
             result.put("streamUrl", streamUrl)
             result.put("ipAddress", ipAddress)
-            result.put("port", DEFAULT_PORT)
+            result.put("port", actualPort)
             result.put("networkSsid", ssid)
             result.put("cameraType", currentCameraType)
             
