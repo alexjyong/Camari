@@ -2,64 +2,27 @@ package com.camari.streaming
 
 import android.app.Activity
 import android.util.Log
-import java.net.InetAddress
-import java.net.NetworkInterface
 
 /**
  * Minimal camera manager stub - to be implemented properly later.
  */
 class CameraManager(private val activity: Activity) {
-    
+
     private var currentCameraType = "front"
     private var sessionStartTime = 0L
     private var isCameraOpen = false
-    
+
     companion object {
         private const val TAG = "CameraManager"
-    }
-
-    fun setCameraType(type: String) {
-        currentCameraType = type
-        Log.i(TAG, "Camera type set to: $type")
-    }
-
-    fun getCameraType(): String {
-        return currentCameraType
-    }
-
-    fun isCameraOpen(): Boolean {
-        return isCameraOpen
-    }
-
-    fun getSessionStartTime(): Long {
-        return sessionStartTime
-    }
-
-    fun startCamera() {
-        Log.i(TAG, "Camera started (stub)")
-        isCameraOpen = true
-        sessionStartTime = System.currentTimeMillis()
-    }
-
-    fun stopCamera() {
-        Log.i(TAG, "Camera stopped")
-        isCameraOpen = false
-    }
-
-    fun release() {
-        stopCamera()
-    }
-
-    fun captureFrame(): ByteArray? {
-        // Return a simple placeholder frame (1x1 pixel JPEG)
-        // This is a minimal valid JPEG
-        return byteArrayOf(
-            0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(),
-            0x00.toByte(), 0x10.toByte(), 0x4A.toByte(), 0x46.toByte(),
+        
+        // Minimal valid 1x1 red pixel JPEG
+        private val PLACEHOLDER_JPEG = byteArrayOf(
+            0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), // SOI, APP0
+            0x00.toByte(), 0x10.toByte(), 0x4A.toByte(), 0x46.toByte(), // JFIF
             0x49.toByte(), 0x46.toByte(), 0x00.toByte(), 0x01.toByte(),
             0x01.toByte(), 0x00.toByte(), 0x00.toByte(), 0x01.toByte(),
             0x00.toByte(), 0x01.toByte(), 0x00.toByte(), 0x00.toByte(),
-            0xFF.toByte(), 0xDB.toByte(), 0x00.toByte(), 0x43.toByte(),
+            0xFF.toByte(), 0xDB.toByte(), 0x00.toByte(), 0x43.toByte(), // DQT
             0x00.toByte(), 0x08.toByte(), 0x06.toByte(), 0x06.toByte(),
             0x07.toByte(), 0x06.toByte(), 0x05.toByte(), 0x08.toByte(),
             0x07.toByte(), 0x07.toByte(), 0x07.toByte(), 0x09.toByte(),
@@ -76,10 +39,10 @@ class CameraManager(private val activity: Activity) {
             0x34.toByte(), 0x34.toByte(), 0x1F.toByte(), 0x27.toByte(),
             0x39.toByte(), 0x3D.toByte(), 0x38.toByte(), 0x32.toByte(),
             0x3C.toByte(), 0x2E.toByte(), 0x33.toByte(), 0x34.toByte(),
-            0x32.toByte(), 0xFF.toByte(), 0xC0.toByte(), 0x00.toByte(),
-            0x0B.toByte(), 0x08.toByte(), 0x00.toByte(), 0x01.toByte(),
+            0x32.toByte(), 0xFF.toByte(), 0xC0.toByte(), 0x00.toByte(), // SOF0
+            0x0B.toByte(), 0x08.toByte(), 0x00.toByte(), 0x01.toByte(), // 1x1
             0x00.toByte(), 0x01.toByte(), 0x01.toByte(), 0x01.toByte(),
-            0x11.toByte(), 0x00.toByte(), 0xFF.toByte(), 0xC4.toByte(),
+            0x11.toByte(), 0x00.toByte(), 0xFF.toByte(), 0xC4.toByte(), // DHT
             0x00.toByte(), 0x1F.toByte(), 0x00.toByte(), 0x00.toByte(),
             0x01.toByte(), 0x05.toByte(), 0x01.toByte(), 0x01.toByte(),
             0x01.toByte(), 0x01.toByte(), 0x01.toByte(), 0x01.toByte(),
@@ -134,13 +97,51 @@ class CameraManager(private val activity: Activity) {
             0xEB.toByte(), 0xF1.toByte(), 0xF2.toByte(), 0xF3.toByte(),
             0xF4.toByte(), 0xF5.toByte(), 0xF6.toByte(), 0xF7.toByte(),
             0xF8.toByte(), 0xF9.toByte(), 0xFA.toByte(), 0xFF.toByte(),
-            0xDA.toByte(), 0x00.toByte(), 0x08.toByte(), 0x01.toByte(),
+            0xDA.toByte(), 0x00.toByte(), 0x08.toByte(), 0x01.toByte(), // SOS
             0x01.toByte(), 0x00.toByte(), 0x00.toByte(), 0x3F.toByte(),
             0x00.toByte(), 0xFB.toByte(), 0xD5.toByte(), 0xDB.toByte(),
             0x20.toByte(), 0xA8.toByte(), 0xF1.toByte(), 0x80.toByte(),
             0x0A.toByte(), 0x28.toByte(), 0xA0.toByte(), 0x02.toByte(),
             0x80.toByte(), 0x0A.toByte(), 0x00.toByte(), 0x00.toByte(),
-            0xFF.toByte(), 0xD9.toByte()
+            0xFF.toByte(), 0xD9.toByte()  // EOI
         )
+    }
+
+    fun setCameraType(type: String) {
+        currentCameraType = type
+        Log.i(TAG, "Camera type set to: $type")
+    }
+
+    fun getCameraType(): String {
+        return currentCameraType
+    }
+
+    fun isCameraOpen(): Boolean {
+        return isCameraOpen
+    }
+
+    fun getSessionStartTime(): Long {
+        return sessionStartTime
+    }
+
+    fun startCamera() {
+        Log.i(TAG, "Camera started (stub)")
+        isCameraOpen = true
+        sessionStartTime = System.currentTimeMillis()
+    }
+
+    fun stopCamera() {
+        Log.i(TAG, "Camera stopped")
+        isCameraOpen = false
+    }
+
+    fun release() {
+        stopCamera()
+    }
+
+    fun captureFrame(): ByteArray? {
+        // Return a simple placeholder frame (1x1 pixel red JPEG)
+        // This is a minimal valid JPEG that browsers/OBS can display
+        return PLACEHOLDER_JPEG
     }
 }

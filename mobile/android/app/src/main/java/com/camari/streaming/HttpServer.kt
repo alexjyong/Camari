@@ -31,7 +31,7 @@ class HttpServer(
 
     /**
      * Start the HTTP server on the specified port.
-     * Binds to all network interfaces (0.0.0.0) to allow connections from WebView.
+     * Binds to all network interfaces (0.0.0.0) to allow connections from WebView and host.
      */
     fun start() {
         if (isRunning.get()) {
@@ -52,14 +52,25 @@ class HttpServer(
             // Small delay to ensure port is fully released
             Thread.sleep(100)
             
-            // Bind to all interfaces (0.0.0.0) to allow WebView connections
+            // Force IPv4 stack for compatibility
+            System.setProperty("java.net.preferIPv4Stack", "true")
+            
+            // Bind to ALL interfaces (0.0.0.0) - this is critical for external access
             serverSocket = ServerSocket(port)
             serverSocket?.reuseAddress = true
             isRunning.set(true)
             
-            val localAddress = serverSocket?.inetAddress?.hostAddress ?: "0.0.0.0"
-            Log.i(TAG, "HTTP server started on $localAddress:$port")
-            Log.i(TAG, "Stream URL: http://$localAddress:$port/stream")
+            // Log all possible access URLs
+            val bindAddress = serverSocket?.inetAddress
+            Log.i(TAG, "===========================================")
+            Log.i(TAG, "HTTP SERVER STARTED")
+            Log.i(TAG, "Bound to: ${bindAddress?.hostAddress ?: "0.0.0.0"}:$port")
+            Log.i(TAG, "java.net.preferIPv4Stack: ${System.getProperty("java.net.preferIPv4Stack")}")
+            Log.i(TAG, "Access URLs:")
+            Log.i(TAG, "  - From WebView: http://localhost:$port/stream")
+            Log.i(TAG, "  - From host (emulator): http://10.0.2.2:$port/stream")
+            Log.i(TAG, "  - From network: http://<device-ip>:$port/stream")
+            Log.i(TAG, "===========================================")
 
             // Start accepting connections in background thread
             Thread {
@@ -109,12 +120,17 @@ class HttpServer(
      * Accept incoming HTTP connections.
      */
     private fun acceptConnections() {
-        Log.i(TAG, "Server accepting connections...")
+        Log.i(TAG, "Server accepting connections on port $port...")
         
         while (isRunning.get()) {
             try {
                 val socket = serverSocket?.accept() ?: continue
-                Log.d(TAG, "New connection from: ${socket.inetAddress.hostAddress}")
+                val clientAddress = socket.inetAddress.hostAddress
+                Log.i(TAG, "===========================================")
+                Log.i(TAG, "NEW CONNECTION ACCEPTED")
+                Log.i(TAG, "Client: $clientAddress")
+                Log.i(TAG, "Local: ${socket.localAddress.hostAddress}:${socket.localPort}")
+                Log.i(TAG, "===========================================")
                 handleConnection(socket)
             } catch (e: IOException) {
                 if (isRunning.get()) {
@@ -132,39 +148,68 @@ class HttpServer(
      * Handle an incoming HTTP connection.
      */
     private fun handleConnection(socket: Socket) {
+        Log.i(TAG, "=== HANDLE CONNECTION START ===")
+        Log.i(TAG, "Socket: $socket")
+        
         try {
             val inputStream = socket.getInputStream()
             val outputStream = socket.getOutputStream()
             
-            // Read HTTP request
-            val request = inputStream.bufferedReader().readLines().firstOrNull() ?: return
+            Log.i(TAG, "Got input/output streams")
             
-            Log.d(TAG, "HTTP request: $request from ${socket.inetAddress.hostAddress}")
+            // Read HTTP request with timeout
+            socket.soTimeout = 2000 // 2 second timeout
+            val reader = inputStream.bufferedReader()
+            val request = reader.readLine()
+            
+            Log.i(TAG, "Received request: '$request'")
+            
+            if (request.isNullOrBlank()) {
+                Log.w(TAG, "Empty request, closing connection")
+                socket.close()
+                return
+            }
             
             // Route request
             when {
                 request.startsWith("GET /stream") -> {
-                    Log.i(TAG, "Starting stream to ${socket.inetAddress.hostAddress}")
+                    Log.i(TAG, "Routing to stream handler")
                     handleStreamRequest(socket, outputStream)
                 }
                 request.startsWith("GET /status") -> {
-                    Log.d(TAG, "Status request")
+                    Log.i(TAG, "Routing to status handler")
                     handleStatusRequest(outputStream)
+                    socket.close()
+                }
+                request.startsWith("GET /health") -> {
+                    Log.i(TAG, "Routing to health handler")
+                    handleHealthCheck(outputStream)
+                    socket.close()
+                }
+                request.startsWith("GET /") -> {
+                    Log.i(TAG, "Routing to root handler")
+                    handleRootRequest(outputStream)
+                    socket.close()
                 }
                 else -> {
                     Log.w(TAG, "Unknown request: $request")
                     handleNotFound(outputStream)
+                    socket.close()
                 }
             }
             
+        } catch (e: java.net.SocketTimeoutException) {
+            Log.w(TAG, "Socket timeout waiting for request")
+            try { socket.close() } catch (ex: Exception) {}
         } catch (e: IOException) {
-            Log.w(TAG, "Client disconnected: ${e.message}")
-            try {
-                socket.close()
-            } catch (ex: IOException) {
-                // Ignore
-            }
+            Log.w(TAG, "IO error: ${e.message}")
+            try { socket.close() } catch (ex: Exception) {}
+        } catch (e: Exception) {
+            Log.e(TAG, "Unexpected error: ${e.message}", e)
+            try { socket.close() } catch (ex: Exception) {}
         }
+        
+        Log.i(TAG, "=== HANDLE CONNECTION END ===")
     }
 
     /**
@@ -261,6 +306,55 @@ class HttpServer(
         
         outputStream.write(response.toByteArray())
         outputStream.flush()
+    }
+
+    /**
+     * Handle root endpoint - simple hello world.
+     */
+    private fun handleRootRequest(outputStream: OutputStream) {
+        val html = """
+            <!DOCTYPE html>
+            <html>
+            <head><title>Camari Webcam Server</title></head>
+            <body>
+                <h1>🎥 Camari Webcam Server</h1>
+                <p>Server is running!</p>
+                <ul>
+                    <li><a href="/stream">/stream</a> - MJPEG video stream (for OBS)</li>
+                    <li><a href="/health">/health</a> - Health check</li>
+                    <li><a href="/status">/status</a> - Server status</li>
+                </ul>
+            </body>
+            </html>
+        """.trimIndent()
+        
+        val response = buildString {
+            append("HTTP/1.1 200 OK\r\n")
+            append("Content-Type: text/html\r\n")
+            append("Content-Length: ${html.length}\r\n")
+            append("\r\n")
+            append(html)
+        }
+        
+        outputStream.write(response.toByteArray())
+        outputStream.flush()
+        Log.i(TAG, "Root request served")
+    }
+
+    /**
+     * Handle health check endpoint.
+     */
+    private fun handleHealthCheck(outputStream: OutputStream) {
+        val response = buildString {
+            append("HTTP/1.1 200 OK\r\n")
+            append("Content-Type: text/plain\r\n")
+            append("\r\n")
+            append("OK - Server is running")
+        }
+        
+        outputStream.write(response.toByteArray())
+        outputStream.flush()
+        Log.i(TAG, "Health check served")
     }
 
     /**
