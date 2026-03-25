@@ -21,8 +21,6 @@ mobile/android/capacitor-cordova-android-plugins/
 mobile/android/capacitor.settings.gradle
 mobile/android/app/src/main/res/xml/config.xml
 
-# Gradle wrapper (JAR is downloaded, properties file is kept)
-mobile/android/gradle/wrapper/gradle-wrapper.jar
 
 # Android build outputs
 mobile/android/app/build/
