@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useStreaming, useBattery, useCamera, useNetworkStatus } from './hooks';
+import { useStreaming, useBattery, useCamera, useNetworkStatus, useToast } from './hooks';
 import {
   StartStreamingButton,
   StreamUrlDisplay,
@@ -7,11 +7,14 @@ import {
   StreamingIndicator,
   BatteryWarning,
   StopStreamingButton,
+  Toast,
+  HelpScreen,
 } from './components';
 import './App.css';
 
 function App() {
-  const [showError, setShowError] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const { toast, showToast, dismissToast } = useToast();
 
   const {
     session,
@@ -23,16 +26,12 @@ function App() {
     stopStreaming,
     clearError,
   } = useStreaming({
-    onStreamingStart: () => {
-      console.log('Streaming started');
-      setShowError(false);
-    },
+    onStreamingStart: () => {},
     onStreamingStop: () => {
-      console.log('Streaming stopped');
+      showToast('Stream stopped', 'info');
     },
     onError: (error) => {
-      console.error('Streaming error:', error);
-      setShowError(true);
+      showToast(error.message || 'Failed to start streaming', 'error');
     },
   });
 
@@ -50,15 +49,11 @@ function App() {
     },
   });
 
-  const handleStartError = () => {
-    clearError();
-    setShowError(false);
-  };
-
   return (
     <div className="app">
       <header className="app-header">
         <h1>Camari</h1>
+        <button className="help-button" onClick={() => setShowHelp(true)} aria-label="Help">?</button>
       </header>
 
       {networkStatus.connectionType === 'none' && (
@@ -74,17 +69,7 @@ function App() {
               onStart={startStreaming}
               isStarting={isStarting}
             />
-            <p className="hint">Tap to start streaming to OBS</p>
-            
-            {showError && session?.errorMessage && (
-              <div className="error-banner">
-                <p className="error-title">⚠️ Streaming Error</p>
-                <p className="error-message">{session.errorMessage}</p>
-                <button className="retry-button" onClick={handleStartError}>
-                  Try Again
-                </button>
-              </div>
-            )}
+            {!isStarting && <p className="hint">Tap to start streaming to OBS</p>}
           </div>
         ) : (
           <>
@@ -129,6 +114,8 @@ function App() {
         )}
       </main>
 
+      <Toast toast={toast} onDismiss={dismissToast} />
+      {showHelp && <HelpScreen onClose={() => setShowHelp(false)} />}
     </div>
   );
 }

@@ -1,0 +1,79 @@
+.help-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+}
+
+.help-sheet {
+  background: #1e2a42;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  border-radius: 16px 16px 0 0;
+  padding: 1.5rem 1.5rem 2.5rem;
+  position: relative;
+}
+
+.help-sheet h2 {
+  margin: 0 0 1.25rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.help-close {
+  position: sticky;
+  top: 0;
+  float: right;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #aaa;
+  font-size: 1rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.help-section {
+  margin-bottom: 1.5rem;
+}
+
+.help-section h3 {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7c8db5;
+  margin: 0 0 0.75rem;
+}
+
+.help-section ol,
+.help-section ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: #c8d0e7;
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+.help-section strong {
+  color: #fff;
+  font-weight: 600;
+}
+
+.help-section a {
+  color: #93c5fd;
+  text-decoration: none;
+}
+
+.help-section a:hover {
+  text-decoration: underline;
+}

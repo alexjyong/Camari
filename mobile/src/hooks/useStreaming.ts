@@ -132,7 +132,6 @@ export function useStreaming(options: UseStreamingOptions = {}): UseStreamingRet
       pollIntervalRef.current = window.setInterval(refreshStatus, statusPollInterval);
       
     } catch (error) {
-      console.error('Failed to start streaming:', error);
       
       const errorSession: StreamingSession = {
         ...createInitialSession(),
@@ -174,7 +173,6 @@ export function useStreaming(options: UseStreamingOptions = {}): UseStreamingRet
       }, 500);
 
     } catch (error) {
-      console.error('Failed to stop streaming:', error);
       setIsStopping(false);
       onError?.(error as Error);
     }
