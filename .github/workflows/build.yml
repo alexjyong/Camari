@@ -47,9 +47,6 @@ jobs:
           cd mobile
           npx cap sync android
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6
-
       - name: Make gradlew executable
         run: chmod +x mobile/android/gradlew
 
