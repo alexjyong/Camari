@@ -10,11 +10,12 @@ There is a debug version of this available in the [releases section](https://git
 
 You'll need [OBS Studio](https://obsproject.com/) installed on your computer first.
 
-1. Install Camari on your Android phone and open it
-2. Tap **Start Streaming** — you'll see a URL like `http://192.168.1.x:8080/`
-3. In OBS, add a **Browser Source**
-4. Paste that URL into the URL field, set width to **1280** and height to **720**
-5. Click OK
+1. Make sure your phone is on wifi or has a hotspot running that your computer is connected to.
+2. Install Camari on your Android phone and open it.
+3. Tap **Start Streaming** — you'll see a URL like `http://192.168.1.x:8080/`
+4. In OBS, add a **Browser Source**
+5. Paste that URL into the URL field, set width to **1280** and height to **720**
+6. Click OK
 
 That's it. Video should appear within a couple seconds.
 
