@@ -1,0 +1,47 @@
+# Specify framework
+.specify/
+.qwen/
+.claude
+specs/
+
+# Node.js / TypeScript
+node_modules/
+dist/
+build/
+*.log
+.env
+.env.local
+.env.*.local
+package-lock.json
+
+# Capacitor (generated on sync)
+mobile/android/app/src/main/assets/
+mobile/android/app/capacitor.build.gradle
+mobile/android/capacitor-cordova-android-plugins/
+mobile/android/capacitor.settings.gradle
+mobile/android/app/src/main/res/xml/config.xml
+
+# Gradle wrapper (JAR is downloaded, properties file is kept)
+mobile/android/gradle/wrapper/gradle-wrapper.jar
+
+# Android build outputs
+mobile/android/app/build/
+mobile/android/.gradle/
+mobile/android/build/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db

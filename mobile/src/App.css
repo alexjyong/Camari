@@ -1,0 +1,81 @@
+/* App-specific styles */
+
+.network-warning-banner {
+  width: 100%;
+  padding: 0.6rem 1.25rem;
+  background: rgba(234, 179, 8, 0.12);
+  border-bottom: 1px solid rgba(234, 179, 8, 0.35);
+  color: #fde68a;
+  font-size: 0.82rem;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.obs-disconnected-banner {
+  width: 100%;
+  padding: 0.6rem 1.25rem;
+  background: rgba(99, 102, 241, 0.12);
+  border-bottom: 1px solid rgba(99, 102, 241, 0.35);
+  color: #c7d2fe;
+  font-size: 0.82rem;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.start-screen {
+  text-align: center;
+}
+
+.streaming-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+}
+
+.stop-button-tray {
+  position: sticky;
+  bottom: 0;
+  width: 100%;
+  max-width: 400px;
+  padding: 0.75rem 0 1rem;
+  background: linear-gradient(to bottom, transparent, #16213e 40%);
+}
+
+.error-banner {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  border-radius: 8px;
+  max-width: 400px;
+  text-align: left;
+}
+
+.error-title {
+  color: #fca5a5;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.error-message {
+  color: #fecaca;
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+}
+
+.retry-button {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.retry-button:hover {
+  background: #dc2626;
+}

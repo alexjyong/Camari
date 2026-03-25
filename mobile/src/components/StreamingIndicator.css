@@ -1,0 +1,45 @@
+.streaming-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: rgba(233, 69, 96, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(233, 69, 96, 0.3);
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #e94560;
+}
+
+.recording-dot {
+  width: 12px;
+  height: 12px;
+  background: #e94560;
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
+}
+
+.duration {
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 1.5rem;
+  color: #ffffff;
+  font-weight: 600;
+}
