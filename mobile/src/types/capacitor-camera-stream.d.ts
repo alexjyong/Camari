@@ -33,6 +33,7 @@ export interface GetStatusResult {
   connectionType: 'wifi' | 'hotspot' | 'none';
   networkSsid: string | null;
   ipAddress: string | null;
+  obsConnected?: boolean;
   errorMessage?: string;
 }
 

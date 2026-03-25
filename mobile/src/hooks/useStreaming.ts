@@ -19,6 +19,8 @@ interface UseStreamingReturn {
   session: StreamingSession | null;
   /** Whether currently streaming */
   isStreaming: boolean;
+  /** Whether OBS is currently connected to the stream */
+  isObsConnected: boolean;
   /** Whether currently starting */
   isStarting: boolean;
   /** Start streaming */
@@ -45,6 +47,7 @@ function createInitialSession(): StreamingSession {
     startedAt: null,
     batteryLevel: 0,
     networkSsid: null,
+    obsConnected: false,
     errorMessage: null,
   };
 }
@@ -85,6 +88,7 @@ export function useStreaming(options: UseStreamingOptions = {}): UseStreamingRet
           isLowBattery: status.isLowBattery,
           networkSsid: status.networkSsid,
           ipAddress: status.ipAddress,
+          obsConnected: status.obsConnected ?? false,
           errorMessage: status.errorMessage || null,
         };
       });
@@ -114,6 +118,7 @@ export function useStreaming(options: UseStreamingOptions = {}): UseStreamingRet
         startedAt: Date.now(),
         batteryLevel: 0,
         networkSsid: result.networkSsid,
+        obsConnected: false,
         errorMessage: null,
       };
 
@@ -194,6 +199,7 @@ export function useStreaming(options: UseStreamingOptions = {}): UseStreamingRet
   return {
     session,
     isStreaming: session?.status === 'streaming',
+    isObsConnected: session?.status === 'streaming' && (session?.obsConnected ?? false),
     isStarting,
     startStreaming,
     stopStreaming,

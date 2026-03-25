@@ -29,6 +29,8 @@ export interface StreamingSession {
   batteryLevel: number;
   /** WiFi network name */
   networkSsid: string | null;
+  /** Whether OBS browser source is currently connected to the stream */
+  obsConnected: boolean;
   /** Error message if status is 'error' */
   errorMessage: string | null;
 }

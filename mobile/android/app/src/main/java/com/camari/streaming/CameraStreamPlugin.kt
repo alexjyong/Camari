@@ -202,6 +202,7 @@ class CameraStreamPlugin : Plugin() {
             result.put("connectionType", connType)
             result.put("networkSsid", networkStatus?.getNetworkSsid())
             result.put("ipAddress", networkStatus?.getIpAddress())
+            result.put("obsConnected", service?.isObsConnected() == true)
             call.resolve(result)
 
         } catch (e: Exception) {

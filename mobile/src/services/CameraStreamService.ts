@@ -38,6 +38,7 @@ export const CameraStream = registerPlugin<CameraStreamPlugin>('CameraStream', {
           isLowBattery: false,
           networkSsid: null,
           ipAddress: null,
+          obsConnected: false,
         };
       },
       async addListener(eventName: string, listenerFunc: (...args: any[]) => any) {

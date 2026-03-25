@@ -63,6 +63,8 @@ class HttpServer(
         }
     }
 
+    fun isClientConnected(): Boolean = clientSocket.get() != null
+
     fun stop() {
         Log.i(TAG, "Stopping HTTP server...")
         isRunning.set(false)
@@ -123,7 +125,7 @@ class HttpServer(
                 requestLine.startsWith("GET /events") -> handleEventsRequest(socket, out)
                 requestLine.startsWith("GET /status") -> { handleStatusRequest(out); socket.close() }
                 requestLine.startsWith("GET /health") -> { handleHealthCheck(out); socket.close() }
-                requestLine.startsWith("GET /")       -> { handleRootRequest(out); socket.close() }
+                requestLine.startsWith("GET / ")       -> { handleRootRequest(out); socket.close() }
                 else -> { handleNotFound(out); socket.close() }
             }
         } catch (e: java.net.SocketTimeoutException) {

@@ -13,11 +13,12 @@ import './App.css';
 function App() {
   const [showError, setShowError] = useState(false);
 
-  const { 
-    session, 
-    isStreaming, 
-    isStarting, 
-    startStreaming, 
+  const {
+    session,
+    isStreaming,
+    isObsConnected,
+    isStarting,
+    startStreaming,
     stopStreaming,
     clearError,
   } = useStreaming({
@@ -96,6 +97,12 @@ function App() {
               batteryLevel={batteryLevel}
               isCharging={isCharging}
             />
+
+            {!isObsConnected && (
+              <div className="obs-disconnected-banner">
+                ⏳ Waiting for OBS to connect — paste the URL below into an OBS Browser Source
+              </div>
+            )}
 
             <StreamUrlDisplay
               url={session?.streamUrl || ''}

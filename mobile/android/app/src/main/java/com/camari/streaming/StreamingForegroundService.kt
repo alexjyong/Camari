@@ -138,6 +138,8 @@ class StreamingForegroundService : Service() {
 
     fun isCameraOpen(): Boolean = cameraManager?.isCameraOpen() == true
 
+    fun isObsConnected(): Boolean = httpServer?.isClientConnected() == true
+
     fun getCameraType(): String = cameraManager?.getCameraType() ?: "front"
 
     fun getSessionStartTime(): Long = cameraManager?.getSessionStartTime() ?: 0L
