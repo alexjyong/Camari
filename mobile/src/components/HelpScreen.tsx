@@ -10,7 +10,7 @@ export function HelpScreen({ onClose }: HelpScreenProps) {
       <div className="help-sheet" onClick={e => e.stopPropagation()}>
         <button className="help-close" onClick={onClose} aria-label="Close help">✕</button>
 
-        <h2>Setup</h2>
+        <h2>Help & About</h2>
 
         <section className="help-section">
           <h3>OBS Browser Source</h3>
@@ -41,6 +41,27 @@ export function HelpScreen({ onClose }: HelpScreenProps) {
             <li>Stream frozen in OBS? Right-click the source → <strong>Refresh</strong></li>
             <li>Can't connect at all? Check that your phone's firewall isn't blocking port 8080</li>
           </ul>
+        </section>
+        <section className="help-section">
+          <h3>About</h3>
+          <p>
+            Camari is free and open source software, released under the{' '}
+            <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noreferrer">GNU GPL v3</a> license.
+            Source code is on{' '}
+            <a href="https://github.com/alexjyong/Camari" target="_blank" rel="noreferrer">GitHub</a>.
+          </p>
+        </section>
+
+        <section className="help-section">
+          <h3>Support the project</h3>
+          <p>If Camari is useful to you, consider buying me a coffee. :) </p>
+          <div className="help-donate-links">
+            <a href="https://buymeacoffee.com/alexjyong" target="_blank" rel="noreferrer">Buy Me a Coffee</a>
+            <a href="https://liberapay.com/alexjyong" target="_blank" rel="noreferrer">Liberapay</a>
+            <a href="https://paypal.me/alexjyong" target="_blank" rel="noreferrer">PayPal</a>
+            <a href="https://cash.app/$ajyong" target="_blank" rel="noreferrer">Cash App</a>
+            <a href="https://account.venmo.com/u/ajyong" target="_blank" rel="noreferrer">Venmo</a>
+          </div>
         </section>
       </div>
     </div>

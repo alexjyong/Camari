@@ -69,6 +69,13 @@
   font-weight: 600;
 }
 
+.help-section p {
+  margin: 0;
+  color: #c8d0e7;
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
 .help-section a {
   color: #93c5fd;
   text-decoration: none;
@@ -76,4 +83,26 @@
 
 .help-section a:hover {
   text-decoration: underline;
+}
+
+.help-donate-links {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+.help-donate-links a {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.85rem;
+  color: #c8d0e7;
+  text-decoration: none;
+}
+
+.help-donate-links a:hover {
+  background: rgba(255, 255, 255, 0.14);
+  text-decoration: none;
 }

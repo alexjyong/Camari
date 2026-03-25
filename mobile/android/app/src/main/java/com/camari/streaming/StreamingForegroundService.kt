@@ -9,6 +9,7 @@ import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
 import android.util.Log
+import android.view.OrientationEventListener
 import androidx.core.app.NotificationCompat
 import com.camari.webcam.MainActivity
 import com.camari.webcam.R
@@ -35,6 +36,7 @@ class StreamingForegroundService : Service() {
     private var httpServer: HttpServer? = null
     private var cameraManager: CameraManager? = null
     private var activePort: Int = 0
+    private var orientationListener: OrientationEventListener? = null
 
     companion object {
         private const val TAG = "StreamingService"
@@ -109,8 +111,23 @@ class StreamingForegroundService : Service() {
         }
 
         activePort = port
-        // startForeground() both satisfies the 5-second requirement (if onStartCommand hasn't
-        // fired yet) and updates the notification text with the real address.
+
+        // Listen to physical device rotation and update the camera orientation automatically.
+        // OrientationEventListener reads the accelerometer directly, works even when the
+        // screen orientation is locked or the activity handles configChanges itself.
+        orientationListener = object : OrientationEventListener(this) {
+            override fun onOrientationChanged(orientation: Int) {
+                if (orientation == ORIENTATION_UNKNOWN) return
+                // Snap to nearest 90° step.
+                // Front camera sensor is mirrored so rotation direction is inverted
+                // relative to the back camera.
+                val snapped = ((orientation + 45) / 90 * 90) % 360
+                val isFront = cameraManager?.getCameraType() == "front"
+                val rotation = if (isFront) (360 - snapped) % 360 else snapped
+                cameraManager?.setOrientation(rotation)
+            }
+        }.also { if (it.canDetectOrientation()) it.enable() }
+
         startForeground(NOTIFICATION_ID, buildNotification("Live at http://$ipAddress:$port/  open app to stop"))
         Log.i(TAG, "Streaming started on port $port")
         return port
@@ -151,6 +168,8 @@ class StreamingForegroundService : Service() {
     // -------------------------------------------------------------------------
 
     private fun stopStreamingInternal() {
+        orientationListener?.disable()
+        orientationListener = null
         httpServer?.stop()
         httpServer = null
         cameraManager?.stopCamera()
