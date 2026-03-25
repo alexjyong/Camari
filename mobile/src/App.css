@@ -1,5 +1,16 @@
 /* App-specific styles */
 
+.network-warning-banner {
+  width: 100%;
+  padding: 0.6rem 1.25rem;
+  background: rgba(234, 179, 8, 0.12);
+  border-bottom: 1px solid rgba(234, 179, 8, 0.35);
+  color: #fde68a;
+  font-size: 0.82rem;
+  text-align: center;
+  line-height: 1.5;
+}
+
 .start-screen {
   text-align: center;
 }

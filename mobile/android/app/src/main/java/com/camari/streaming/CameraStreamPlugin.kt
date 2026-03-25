@@ -101,7 +101,7 @@ class CameraStreamPlugin : Plugin() {
 
         val service = streamingService
         if (service == null) {
-            call.reject("Streaming service not ready — please try again")
+            call.reject("Streaming service not ready, please try again")
             return
         }
 
@@ -193,11 +193,13 @@ class CameraStreamPlugin : Plugin() {
             val isStreaming = service?.isCameraOpen() == true
 
             val result = JSObject()
+            val connType = networkStatus?.getConnectionType()?.name?.lowercase() ?: "none"
             result.put("status", if (isStreaming) "streaming" else "idle")
             result.put("cameraType", if (isStreaming) service?.getCameraType() else null)
             result.put("batteryLevel", batteryMonitor?.getBatteryLevel() ?: 0)
             result.put("isCharging", batteryMonitor?.isCharging() ?: false)
             result.put("isLowBattery", batteryMonitor?.isLowBattery() ?: false)
+            result.put("connectionType", connType)
             result.put("networkSsid", networkStatus?.getNetworkSsid())
             result.put("ipAddress", networkStatus?.getIpAddress())
             call.resolve(result)

@@ -4,6 +4,8 @@ import './StreamUrlDisplay.css';
 interface StreamUrlDisplayProps {
   /** Full streaming URL */
   url: string;
+  /** wifi | hotspot | none */
+  connectionType?: 'wifi' | 'hotspot' | 'none' | null;
   /** WiFi network name */
   networkSsid?: string | null;
   /** Device IP address */
@@ -15,11 +17,11 @@ interface StreamUrlDisplayProps {
 /**
  * Displays the streaming URL prominently for OBS browser source.
  */
-export function StreamUrlDisplay({ 
-  url, 
+export function StreamUrlDisplay({
+  url,
+  connectionType,
   networkSsid,
-  ipAddress,
-  enableCopy = true 
+  enableCopy = true
 }: StreamUrlDisplayProps) {
   const [copied, setCopied] = useState(false);
 
@@ -39,15 +41,19 @@ export function StreamUrlDisplay({
         OBS Browser Source URL:
       </label>
       
-      {networkSsid && (
-        <div className="network-info">
-          <span className="network-icon">📶</span>
-          <span className="network-name">{networkSsid}</span>
-          {ipAddress && (
-            <span className="ip-address">({ipAddress})</span>
-          )}
-        </div>
-      )}
+      <div className="network-info">
+        {connectionType === 'wifi' && networkSsid ? (
+          <>
+            <span className="network-icon">📶</span>
+            <span>OBS must be on <strong>{networkSsid}</strong> WiFi</span>
+          </>
+        ) : connectionType === 'hotspot' ? (
+          <>
+            <span className="network-icon">📡</span>
+            <span>Connect your OBS computer to your phone's hotspot</span>
+          </>
+        ) : null}
+      </div>
       
       <div className="url-container">
         <code className="url-text">{url}</code>

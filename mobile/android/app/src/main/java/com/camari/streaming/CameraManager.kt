@@ -41,7 +41,7 @@ class CameraManager(private val context: Context) {
     private var cameraThread: HandlerThread? = null
     private var cameraHandler: Handler? = null
 
-    // Latest JPEG frame — written by camera thread, read by HTTP server thread
+    // Latest JPEG frame ;  written by camera thread, read by HTTP server thread
     private val latestFrame = AtomicReference<ByteArray?>(null)
 
     // Guards against concurrent startCamera calls (e.g. during camera switch)

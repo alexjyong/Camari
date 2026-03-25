@@ -30,6 +30,7 @@ export interface GetStatusResult {
   batteryLevel: number;
   isCharging: boolean;
   isLowBattery: boolean;
+  connectionType: 'wifi' | 'hotspot' | 'none';
   networkSsid: string | null;
   ipAddress: string | null;
   errorMessage?: string;

@@ -44,14 +44,16 @@ export function useNetworkStatus(options: UseNetworkStatusOptions = {}): UseNetw
       const pluginStatus = await CameraStream.getStatus();
       
       setStatus(prev => {
+        const connType = (pluginStatus.connectionType ?? 'none') as NetworkStatusState['connectionType'];
         const newStatus: NetworkStatusState = {
-          isConnected: pluginStatus.status !== 'reconnecting' && pluginStatus.ipAddress !== null,
+          connectionType: connType,
+          isConnected: connType !== 'none',
           ssid: pluginStatus.networkSsid,
           ipAddress: pluginStatus.ipAddress,
-          signalStrength: null, // Would need native implementation
+          signalStrength: null,
           isReconnecting: pluginStatus.status === 'reconnecting',
-          reconnectTimeoutAt: null, // Would need native implementation
-          quality: pluginStatus.ipAddress ? getConnectionQuality(-60) : null, // Estimate
+          reconnectTimeoutAt: null,
+          quality: pluginStatus.ipAddress ? getConnectionQuality(-60) : null,
         };
         
         // Check for reconnection timeout

@@ -5,197 +5,169 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.util.Log
+import java.net.Inet4Address
+import java.net.NetworkInterface
 
 /**
- * Monitors WiFi network status and provides connectivity information.
+ * Monitors network status and provides connectivity information.
+ *
+ * Supports three modes:
+ * - WIFI: phone is connected to a WiFi access point as a client
+ * - HOTSPOT: phone is the access point; a PC connecting to it can reach the HTTP server
+ * - NONE: cellular only or no network ;  OBS cannot connect
  */
 class NetworkStatus(private val context: Context) {
-    
-    private val connectivityManager: ConnectivityManager
-    private val wifiManager: WifiManager
+
+    private val connectivityManager =
+        context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    private val wifiManager =
+        context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
-    
-    private var isConnectedState = false
-    private var isReconnectingState = false
-    private var reconnectTimeoutAt: Long? = null
-    
+
     companion object {
         private const val TAG = "NetworkStatus"
-        private const val RECONNECT_TIMEOUT_MS = 60_000L // 60 seconds
+        private const val RECONNECT_TIMEOUT_MS = 60_000L
     }
 
     init {
-        connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-        
         registerNetworkCallback()
     }
 
-    /**
-     * Check if device is connected to WiFi.
-     */
-    fun isConnected(): Boolean {
-        val network = connectivityManager.activeNetwork ?: return false
-        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+    // -------------------------------------------------------------------------
+    // Connection type
+    // -------------------------------------------------------------------------
+
+    fun getConnectionType(): ConnectionType {
+        if (isWifiClient()) return ConnectionType.WIFI
+        if (isHotspotEnabled()) return ConnectionType.HOTSPOT
+        return ConnectionType.NONE
     }
 
+    /** True when the phone is connected to WiFi as a client OR is running a hotspot. */
+    fun isConnected(): Boolean = getConnectionType() != ConnectionType.NONE
+
+    // -------------------------------------------------------------------------
+    // Network info
+    // -------------------------------------------------------------------------
+
     /**
-     * Get the current WiFi network SSID.
+     * SSID of the WiFi network the phone is connected to, or null if on hotspot / no WiFi.
+     * Returns null in hotspot mode ;  use getConnectionType() to distinguish.
      */
     fun getNetworkSsid(): String? {
-        val wifiInfo = wifiManager.connectionInfo
-        val ssid = wifiInfo.ssid
-        
-        // Remove quotes if present
+        if (!isWifiClient()) return null
+        val ssid = getWifiInfo()?.ssid ?: return null
         return ssid.removeSurrounding("\"").takeIf { it != "<unknown ssid>" }
     }
 
     /**
-     * Get the device's IP address on the local network.
+     * The phone's IP address on the local network.
+     * Uses NetworkInterface enumeration ;  works for WiFi client, hotspot, and USB tethering.
      */
     fun getIpAddress(): String? {
-        val wifiInfo = wifiManager.connectionInfo
-        val ip = wifiInfo.ipAddress
-        
-        if (ip == 0) return null
-        
-        // Convert integer IP to string format
-        return String.format(
-            "%d.%d.%d.%d",
-            ip and 0xFF,
-            (ip shr 8) and 0xFF,
-            (ip shr 16) and 0xFF,
-            (ip shr 24) and 0xFF
-        )
+        return try {
+            NetworkInterface.getNetworkInterfaces()
+                ?.asSequence()
+                ?.filter { it.isUp && !it.isLoopback }
+                ?.flatMap { it.inetAddresses.asSequence() }
+                ?.filterIsInstance<Inet4Address>()
+                ?.filterNot { it.isLoopbackAddress }
+                ?.map { it.hostAddress }
+                ?.firstOrNull()
+        } catch (e: Exception) {
+            Log.w(TAG, "getIpAddress failed: ${e.message}")
+            null
+        }
     }
 
-    /**
-     * Get WiFi signal strength in dBm.
-     */
-    fun getSignalStrength(): Int {
-        val wifiInfo = wifiManager.connectionInfo
-        return wifiInfo.rssi
-    }
+    fun getSignalStrength(): Int = getWifiInfo()?.rssi ?: -100
 
-    /**
-     * Get connection quality based on signal strength.
-     */
     fun getConnectionQuality(): ConnectionQuality {
         val rssi = getSignalStrength()
         return when {
             rssi >= -50 -> ConnectionQuality.EXCELLENT
             rssi >= -65 -> ConnectionQuality.GOOD
             rssi >= -75 -> ConnectionQuality.FAIR
-            else -> ConnectionQuality.POOR
+            else        -> ConnectionQuality.POOR
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Private
+    // -------------------------------------------------------------------------
+
     /**
-     * Check if currently attempting reconnection.
+     * `WifiManager.isWifiApEnabled()` is a hidden API so we call it via reflection.
+     * Returns false if the method is unavailable (future Android versions).
      */
-    fun isReconnecting(): Boolean {
-        if (!isReconnectingState) return false
-        
-        // Check if timeout has expired
-        val timeout = reconnectTimeoutAt
-        if (timeout != null && System.currentTimeMillis() > timeout) {
-            isReconnectingState = false
-            reconnectTimeoutAt = null
-            return false
+    /**
+     * Returns the current WifiInfo.
+     * API 31+: retrieved from NetworkCapabilities.transportInfo (non-deprecated path).
+     * API 29-30: retrieved from WifiManager.connectionInfo (deprecated in 31, still works).
+     */
+    private fun getWifiInfo(): WifiInfo? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val network = connectivityManager.activeNetwork ?: return null
+            val caps = connectivityManager.getNetworkCapabilities(network) ?: return null
+            caps.transportInfo as? WifiInfo
+        } else {
+            @Suppress("DEPRECATION")
+            wifiManager.connectionInfo
         }
-        
-        return true
     }
 
-    /**
-     * Start reconnection attempt with timeout.
-     */
-    fun startReconnection() {
-        isReconnectingState = true
-        reconnectTimeoutAt = System.currentTimeMillis() + RECONNECT_TIMEOUT_MS
-        Log.i(TAG, "Reconnection started, timeout: ${RECONNECT_TIMEOUT_MS / 1000}s")
+    private fun isHotspotEnabled(): Boolean {
+        return try {
+            wifiManager.javaClass.getMethod("isWifiApEnabled").invoke(wifiManager) as Boolean
+        } catch (e: Exception) {
+            Log.w(TAG, "isWifiApEnabled unavailable: ${e.message}")
+            false
+        }
     }
 
-    /**
-     * Stop reconnection attempt.
-     */
-    fun stopReconnection() {
-        isReconnectingState = false
-        reconnectTimeoutAt = null
-        Log.i(TAG, "Reconnection stopped")
+    private fun isWifiClient(): Boolean {
+        val network = connectivityManager.activeNetwork ?: return false
+        val caps = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
     }
 
-    /**
-     * Get reconnection timeout timestamp.
-     */
-    fun getReconnectTimeoutAt(): Long? {
-        return reconnectTimeoutAt
-    }
-
-    /**
-     * Register for network state changes.
-     */
     private fun registerNetworkCallback() {
-        val networkRequest = NetworkRequest.Builder()
+        val request = NetworkRequest.Builder()
             .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
             .build()
 
         networkCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 Log.i(TAG, "WiFi available")
-                isConnectedState = true
-                stopReconnection()
             }
-
             override fun onLost(network: Network) {
                 Log.w(TAG, "WiFi lost")
-                isConnectedState = false
-                startReconnection()
-            }
-
-            override fun onCapabilitiesChanged(
-                network: Network,
-                networkCapabilities: NetworkCapabilities
-            ) {
-                val wasConnected = isConnectedState
-                isConnectedState = networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
-                
-                if (wasConnected && !isConnectedState) {
-                    startReconnection()
-                } else if (!wasConnected && isConnectedState) {
-                    stopReconnection()
-                }
             }
         }
 
         try {
-            connectivityManager.registerNetworkCallback(networkRequest, networkCallback!!)
+            connectivityManager.registerNetworkCallback(request, networkCallback!!)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to register network callback", e)
         }
     }
 
-    /**
-     * Unregister network callback.
-     */
     fun unregister() {
         try {
-            networkCallback?.let {
-                connectivityManager.unregisterNetworkCallback(it)
-            }
+            networkCallback?.let { connectivityManager.unregisterNetworkCallback(it) }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to unregister network callback", e)
         }
     }
 }
 
-/**
- * WiFi connection quality levels.
- */
+enum class ConnectionType { WIFI, HOTSPOT, NONE }
+
 enum class ConnectionQuality {
     EXCELLENT,  // >= -50 dBm
     GOOD,       // >= -65 dBm

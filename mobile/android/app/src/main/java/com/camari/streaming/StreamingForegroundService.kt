@@ -3,19 +3,21 @@ package com.camari.streaming
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.camari.webcam.MainActivity
 import com.camari.webcam.R
 
 /**
  * Foreground service that owns the HttpServer and CameraManager lifecycle.
  *
  * Running as a foreground service keeps the streaming process alive when the app
- * is minimized — Android won't kill foreground services unless under extreme memory
+ * is minimized, Android won't kill foreground services unless under extreme memory
  * pressure, and they survive the app being swiped away from recents on most devices.
  *
  * Lifecycle:
@@ -55,7 +57,7 @@ class StreamingForegroundService : Service() {
      * will immediately overwrite via another startForeground() call.
      */
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val text = if (activePort > 0) "Streaming on port $activePort — open app to stop"
+        val text = if (activePort > 0) "Streaming on port $activePort, open app to stop"
                    else "Starting…"
         startForeground(NOTIFICATION_ID, buildNotification(text))
         return START_STICKY
@@ -70,7 +72,7 @@ class StreamingForegroundService : Service() {
     }
 
     // -------------------------------------------------------------------------
-    // Public API — called by CameraStreamPlugin
+    // Public API: called by CameraStreamPlugin
     // -------------------------------------------------------------------------
 
     /**
@@ -109,7 +111,7 @@ class StreamingForegroundService : Service() {
         activePort = port
         // startForeground() both satisfies the 5-second requirement (if onStartCommand hasn't
         // fired yet) and updates the notification text with the real address.
-        startForeground(NOTIFICATION_ID, buildNotification("Live at http://$ipAddress:$port/ — open app to stop"))
+        startForeground(NOTIFICATION_ID, buildNotification("Live at http://$ipAddress:$port/  open app to stop"))
         Log.i(TAG, "Streaming started on port $port")
         return port
     }
@@ -167,12 +169,20 @@ class StreamingForegroundService : Service() {
     }
 
     private fun buildNotification(statusText: String): Notification {
+        val tapIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val tapPendingIntent = PendingIntent.getActivity(
+            this, 0, tapIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Camari Streaming")
             .setContentText(statusText)
             .setSmallIcon(R.mipmap.ic_launcher_round)
             .setOngoing(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setContentIntent(tapPendingIntent)
             .build()
     }
 }

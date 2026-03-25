@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useStreaming, useBattery, useCamera } from './hooks';
+import { useStreaming, useBattery, useCamera, useNetworkStatus } from './hooks';
 import {
   StartStreamingButton,
   StreamUrlDisplay,
@@ -40,6 +40,8 @@ function App() {
     },
   });
 
+  const { status: networkStatus } = useNetworkStatus();
+
   const { level: batteryLevel, isCharging } = useBattery({
     onLowBattery: (level) => {
       console.log('Low battery:', level, '%');
@@ -55,13 +57,19 @@ function App() {
     <div className="app">
       <header className="app-header">
         <h1>Camari</h1>
-        <p className="tagline">Android Webcam for OBS</p>
+        <p className="tagline">Free and Open Source Android Webcam for OBS</p>
       </header>
+
+      {networkStatus.connectionType === 'none' && (
+        <div className="network-warning-banner">
+          ⚠️ No local network detected. Connect to WiFi or enable your phone's hotspot; OBS needs a direct connection to your phone.
+        </div>
+      )}
 
       <main className="app-main">
         {!isStreaming ? (
           <div className="start-screen">
-            <StartStreamingButton 
+            <StartStreamingButton
               onStart={startStreaming}
               isStarting={isStarting}
             />
@@ -89,10 +97,10 @@ function App() {
               isCharging={isCharging}
             />
 
-            <StreamUrlDisplay 
+            <StreamUrlDisplay
               url={session?.streamUrl || ''}
-              networkSsid={session?.networkSsid}
-              ipAddress={session?.ipAddress}
+              connectionType={networkStatus.connectionType}
+              networkSsid={networkStatus.ssid}
             />
 
             <CameraSwitchButton
@@ -110,7 +118,7 @@ function App() {
       </main>
 
       <footer className="app-footer">
-        <p>📶 Make sure your phone and computer are on the same WiFi network</p>
+        <p>Camari: Free and Open Source Android Webcam for OBS</p>
       </footer>
     </div>
   );

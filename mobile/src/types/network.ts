@@ -3,11 +3,14 @@
  */
 
 export type ConnectionQuality = 'excellent' | 'good' | 'fair' | 'poor';
+export type ConnectionType = 'wifi' | 'hotspot' | 'none';
 
 export interface NetworkStatusState {
-  /** Whether device is connected to WiFi */
+  /** wifi = connected as client, hotspot = phone is the AP, none = cellular only */
+  connectionType: ConnectionType;
+  /** True when connectionType is wifi or hotspot */
   isConnected: boolean;
-  /** WiFi network name (SSID) */
+  /** WiFi network name (SSID) ;  null in hotspot mode */
   ssid: string | null;
   /** Device IP address */
   ipAddress: string | null;
@@ -22,6 +25,7 @@ export interface NetworkStatusState {
 }
 
 export const DEFAULT_NETWORK_STATUS: NetworkStatusState = {
+  connectionType: 'none',
   isConnected: false,
   ssid: null,
   ipAddress: null,
