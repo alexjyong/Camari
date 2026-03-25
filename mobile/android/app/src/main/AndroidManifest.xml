@@ -13,6 +13,11 @@
 
     <!-- Foreground service for background streaming -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Required on API 34+ to use camera from a foreground service -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+
+    <!-- Required on API 33+ to show any notification (including foreground service notification) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Keep screen on during streaming -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -40,6 +45,12 @@
             </intent-filter>
 
         </activity>
+
+        <!-- Foreground service that keeps camera + HTTP server alive when app is backgrounded -->
+        <service
+            android:name="com.camari.streaming.StreamingForegroundService"
+            android:foregroundServiceType="camera"
+            android:exported="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

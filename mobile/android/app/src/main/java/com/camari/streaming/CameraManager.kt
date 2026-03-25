@@ -12,7 +12,6 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
 import android.util.Size
-import android.app.Activity
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -26,14 +25,14 @@ import java.util.concurrent.atomic.AtomicReference
  * - [captureFrame] is called by the HTTP server thread and reads the latest frame.
  * - Front camera is default; [setCameraType] restarts the session with the other camera.
  */
-class CameraManager(private val activity: Activity) {
+class CameraManager(private val context: Context) {
 
     private var currentCameraType = "front"
     private var sessionStartTime = 0L
     private var cameraOpen = false
 
     private val systemCameraManager =
-        activity.getSystemService(Context.CAMERA_SERVICE) as android.hardware.camera2.CameraManager
+        context.getSystemService(Context.CAMERA_SERVICE) as android.hardware.camera2.CameraManager
 
     private var cameraDevice: CameraDevice? = null
     private var captureSession: CameraCaptureSession? = null

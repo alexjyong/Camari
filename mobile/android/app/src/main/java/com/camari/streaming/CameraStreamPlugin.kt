@@ -1,7 +1,12 @@
 package com.camari.streaming
 
 import android.Manifest
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.core.app.ActivityCompat
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
@@ -15,6 +20,9 @@ import com.camari.network.BatteryMonitor
 
 /**
  * Capacitor plugin for camera streaming to OBS via HTTP server.
+ *
+ * Delegates camera and server lifecycle to StreamingForegroundService so that
+ * the stream survives the app being backgrounded.
  */
 @CapacitorPlugin(
     name = "CameraStream",
@@ -27,17 +35,28 @@ import com.camari.network.BatteryMonitor
 )
 class CameraStreamPlugin : Plugin() {
 
-    private var httpServer: HttpServer? = null
-    private var cameraManager: CameraManager? = null
+    private var streamingService: StreamingForegroundService? = null
+    private var serviceBound = false
     private var networkStatus: NetworkStatus? = null
     private var batteryMonitor: BatteryMonitor? = null
-    
-    private var isStreaming = false
     private var currentCameraType = "front"
-    
+
     companion object {
-        private const val DEFAULT_PORT = 8080
         private const val TAG = "CameraStreamPlugin"
+    }
+
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName, binder: android.os.IBinder) {
+            streamingService = (binder as StreamingForegroundService.LocalBinder).getService()
+            serviceBound = true
+            android.util.Log.i(TAG, "Bound to StreamingForegroundService")
+        }
+
+        override fun onServiceDisconnected(name: ComponentName) {
+            streamingService = null
+            serviceBound = false
+            android.util.Log.w(TAG, "StreamingForegroundService disconnected unexpectedly")
+        }
     }
 
     override fun load() {
@@ -45,7 +64,26 @@ class CameraStreamPlugin : Plugin() {
         try {
             networkStatus = NetworkStatus(activity)
             batteryMonitor = BatteryMonitor(activity)
-            android.util.Log.i(TAG, "Plugin loaded successfully")
+
+            // Bind to the service now so it's ready by the time the user taps Start.
+            // BIND_AUTO_CREATE creates the service process without starting it as foreground yet.
+            val intent = Intent(activity, StreamingForegroundService::class.java)
+            activity.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+
+            // Android 13+ requires POST_NOTIFICATIONS at runtime for the foreground service
+            // notification to be visible. Request it early so it's granted before streaming starts.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (ActivityCompat.checkSelfPermission(activity, Manifest.permission.POST_NOTIFICATIONS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                    ActivityCompat.requestPermissions(
+                        activity,
+                        arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                        /* requestCode = */ 1002
+                    )
+                }
+            }
+
+            android.util.Log.i(TAG, "Plugin loaded, binding to StreamingForegroundService")
         } catch (e: Exception) {
             android.util.Log.e(TAG, "Error loading plugin: ${e.message}")
         }
@@ -54,64 +92,44 @@ class CameraStreamPlugin : Plugin() {
     @PluginMethod
     fun startStreaming(call: PluginCall) {
         android.util.Log.i(TAG, "startStreaming called")
-        
+
         if (!hasCameraPermission()) {
-            android.util.Log.w(TAG, "Camera permission not granted, requesting...")
+            android.util.Log.w(TAG, "Camera permission not granted, requesting…")
             requestPermissionForAlias("camera", call, "cameraPermissionCallback")
             return
         }
 
+        val service = streamingService
+        if (service == null) {
+            call.reject("Streaming service not ready — please try again")
+            return
+        }
+
         try {
-            // Clean up any existing resources first
-            stopInternal()
-            
-            // Initialize camera manager
-            cameraManager = CameraManager(activity)
-            cameraManager?.setCameraType(currentCameraType)
-            cameraManager?.startCamera()
-            
-            // Initialize and start HTTP server, trying multiple ports if needed
-            val portsToTry = listOf(DEFAULT_PORT, 8081, 8082, 8083)
-            var serverStarted = false
-            var actualPort = DEFAULT_PORT
-            
-            for (port in portsToTry) {
-                try {
-                    httpServer = HttpServer(port, cameraManager!!)
-                    httpServer?.start()
-                    actualPort = port
-                    serverStarted = true
-                    android.util.Log.i(TAG, "Server started on port $port")
-                    break
-                } catch (e: Exception) {
-                    android.util.Log.w(TAG, "Failed to start on port $port: ${e.message}")
-                    httpServer = null
-                    // Try next port
-                }
-            }
-            
-            if (!serverStarted) {
-                throw RuntimeException("Could not start server on any port")
-            }
-            
-            // Get network info
+            // startForegroundService ensures the service survives if we later unbind.
+            // The service calls startForeground() in onStartCommand() within the 5-second window.
+            val intent = Intent(activity, StreamingForegroundService::class.java)
+            activity.startForegroundService(intent)
+
             val ipAddress = networkStatus?.getIpAddress() ?: "192.168.1.100"
+            val port = service.startStreaming(currentCameraType, ipAddress)
+            if (port == -1) {
+                call.reject("Could not start server on any available port")
+                return
+            }
             val ssid = networkStatus?.getNetworkSsid() ?: "WiFi"
-            val streamUrl = "http://$ipAddress:$actualPort/stream"
-            
+            val streamUrl = "http://$ipAddress:$port/"
+
             android.util.Log.i(TAG, "Streaming started: $streamUrl")
-            
-            // Build result
+
             val result = JSObject()
             result.put("streamUrl", streamUrl)
             result.put("ipAddress", ipAddress)
-            result.put("port", actualPort)
+            result.put("port", port)
             result.put("networkSsid", ssid)
             result.put("cameraType", currentCameraType)
-            
-            isStreaming = true
             call.resolve(result)
-            
+
         } catch (e: Exception) {
             android.util.Log.e(TAG, "Error starting streaming: ${e.message}", e)
             call.reject("Failed to start streaming: ${e.message}")
@@ -121,56 +139,36 @@ class CameraStreamPlugin : Plugin() {
     @PluginMethod
     fun stopStreaming(call: PluginCall) {
         android.util.Log.i(TAG, "stopStreaming called")
-        
         try {
-            stopInternal()
+            streamingService?.stopStreaming()
             call.resolve()
         } catch (e: Exception) {
             android.util.Log.e(TAG, "Error stopping streaming: ${e.message}", e)
             call.reject("Failed to stop streaming: ${e.message}")
         }
     }
-    
-    /**
-     * Internal stop method that cleans up resources.
-     */
-    private fun stopInternal() {
-        try {
-            httpServer?.stop()
-            httpServer = null
-            
-            cameraManager?.stopCamera()
-            cameraManager = null
-            
-            isStreaming = false
-            android.util.Log.i(TAG, "Resources cleaned up")
-        } catch (e: Exception) {
-            android.util.Log.e(TAG, "Error in stopInternal: ${e.message}", e)
-        }
-    }
 
     @PluginMethod
     fun switchCamera(call: PluginCall) {
         android.util.Log.i(TAG, "switchCamera called")
-        
-        if (!isStreaming) {
-            android.util.Log.w(TAG, "Not streaming, cannot switch camera")
+
+        val service = streamingService
+        if (service == null || !service.isCameraOpen()) {
             call.reject("Not currently streaming")
             return
         }
 
         try {
             currentCameraType = if (currentCameraType == "front") "back" else "front"
-            cameraManager?.setCameraType(currentCameraType)
-            
+            service.switchCamera(currentCameraType)
+
             android.util.Log.i(TAG, "Switched to $currentCameraType camera")
-            
+
             val result = JSObject()
             result.put("cameraType", currentCameraType)
             result.put("success", true)
-            
             call.resolve(result)
-            
+
         } catch (e: Exception) {
             android.util.Log.e(TAG, "Error switching camera: ${e.message}", e)
             val result = JSObject()
@@ -183,7 +181,7 @@ class CameraStreamPlugin : Plugin() {
     @PluginMethod
     fun setOrientation(call: PluginCall) {
         val degrees = call.getInt("degrees") ?: 0
-        cameraManager?.setOrientation(degrees)
+        streamingService?.setOrientation(degrees)
         android.util.Log.i(TAG, "Orientation set to ${degrees}°")
         call.resolve()
     }
@@ -191,24 +189,19 @@ class CameraStreamPlugin : Plugin() {
     @PluginMethod
     fun getStatus(call: PluginCall) {
         try {
+            val service = streamingService
+            val isStreaming = service?.isCameraOpen() == true
+
             val result = JSObject()
-            
-            val status = when {
-                !isStreaming -> "idle"
-                networkStatus?.isConnected() == false -> "reconnecting"
-                else -> "streaming"
-            }
-            
-            result.put("status", status)
-            result.put("cameraType", if (isStreaming) currentCameraType else null)
+            result.put("status", if (isStreaming) "streaming" else "idle")
+            result.put("cameraType", if (isStreaming) service?.getCameraType() else null)
             result.put("batteryLevel", batteryMonitor?.getBatteryLevel() ?: 0)
             result.put("isCharging", batteryMonitor?.isCharging() ?: false)
             result.put("isLowBattery", batteryMonitor?.isLowBattery() ?: false)
             result.put("networkSsid", networkStatus?.getNetworkSsid())
             result.put("ipAddress", networkStatus?.getIpAddress())
-            
             call.resolve(result)
-            
+
         } catch (e: Exception) {
             android.util.Log.e(TAG, "Error getting status: ${e.message}", e)
             call.reject("Failed to get status: ${e.message}")
@@ -225,22 +218,24 @@ class CameraStreamPlugin : Plugin() {
     @PermissionCallback
     private fun cameraPermissionCallback(call: PluginCall) {
         android.util.Log.i(TAG, "Permission callback called")
-        
         if (hasCameraPermission()) {
-            android.util.Log.i(TAG, "Permission granted, starting streaming")
             startStreaming(call)
         } else {
-            android.util.Log.w(TAG, "Permission denied")
             call.reject("Camera permission denied")
         }
     }
-    
+
     /**
-     * Clean up resources when the plugin is destroyed.
+     * Called when the plugin is destroyed (activity finishing).
+     * Stops the service fully and unbinds.
      */
     fun cleanup() {
-        android.util.Log.i(TAG, "Cleaning up resources")
-        stopInternal()
+        android.util.Log.i(TAG, "Cleaning up plugin")
+        streamingService?.stopStreaming()
+        if (serviceBound) {
+            try { activity.unbindService(serviceConnection) } catch (_: Exception) {}
+            serviceBound = false
+        }
         batteryMonitor?.unregister()
         networkStatus?.unregister()
     }

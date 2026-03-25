@@ -26,6 +26,7 @@ class HttpServer(
     private var serverSocket: ServerSocket? = null
     private val isRunning = AtomicBoolean(false)
     private val clientSocket = AtomicReference<Socket?>(null)
+    private val streamThread = AtomicReference<Thread?>(null)
 
     companion object {
         private const val TAG = "HttpServer"
@@ -66,7 +67,17 @@ class HttpServer(
         Log.i(TAG, "Stopping HTTP server...")
         isRunning.set(false)
 
-        try { clientSocket.getAndSet(null)?.close() } catch (e: IOException) { /* ignore */ }
+        // Interrupt the stream thread immediately — wakes it from Thread.sleep() without waiting
+        streamThread.getAndSet(null)?.interrupt()
+
+        // Close with SO_LINGER=0 to send TCP RST instead of FIN.
+        // RST looks like an error to OBS/CEF, which triggers it to retry the stream URL
+        // rather than freezing on the last frame (which a clean FIN causes).
+        clientSocket.getAndSet(null)?.let { socket ->
+            try { socket.setSoLinger(true, 0) } catch (_: Exception) {}
+            try { socket.close() } catch (_: IOException) {}
+        }
+
         try { serverSocket?.close(); serverSocket = null } catch (e: IOException) { /* ignore */ }
 
         Log.i(TAG, "HTTP server stopped")
@@ -109,6 +120,7 @@ class HttpServer(
             val out = BufferedOutputStream(socket.getOutputStream())
             when {
                 requestLine.startsWith("GET /stream") -> handleStreamRequest(socket, out)
+                requestLine.startsWith("GET /events") -> handleEventsRequest(socket, out)
                 requestLine.startsWith("GET /status") -> { handleStatusRequest(out); socket.close() }
                 requestLine.startsWith("GET /health") -> { handleHealthCheck(out); socket.close() }
                 requestLine.startsWith("GET /")       -> { handleRootRequest(out); socket.close() }
@@ -149,6 +161,7 @@ class HttpServer(
 
     private fun handleStreamRequest(socket: Socket, out: BufferedOutputStream) {
         clientSocket.set(socket)
+        streamThread.set(Thread.currentThread())
 
         val headers = "HTTP/1.1 200 OK\r\n" +
             "Content-Type: $MIME_TYPE\r\n" +
@@ -189,10 +202,44 @@ class HttpServer(
             }
         } catch (e: IOException) {
             Log.i(TAG, "Stream ended after $frameCount frames: ${e.message}")
+        } catch (e: InterruptedException) {
+            Log.i(TAG, "Stream thread interrupted after $frameCount frames")
+            Thread.currentThread().interrupt() // restore interrupted status
         } finally {
+            streamThread.compareAndSet(Thread.currentThread(), null)
             clientSocket.compareAndSet(socket, null)
             try { socket.close() } catch (_: IOException) {}
             Log.i(TAG, "Stream closed after $frameCount frames")
+        }
+    }
+
+    /**
+     * Server-Sent Events heartbeat endpoint.
+     * OBS browser source uses EventSource('/events') to detect server up/down.
+     * EventSource reconnects at the network layer — not subject to CEF timer throttling
+     * unlike setInterval/fetch polling. onopen = server up, onerror = server down.
+     */
+    private fun handleEventsRequest(socket: Socket, out: BufferedOutputStream) {
+        val headers = "HTTP/1.1 200 OK\r\n" +
+            "Content-Type: text/event-stream\r\n" +
+            "Cache-Control: no-cache\r\n" +
+            "Connection: keep-alive\r\n" +
+            "\r\n"
+        out.write(headers.toByteArray(Charsets.US_ASCII))
+        out.flush()
+
+        try {
+            while (isRunning.get() && !socket.isClosed) {
+                out.write("data: ping\n\n".toByteArray(Charsets.US_ASCII))
+                out.flush()
+                Thread.sleep(5000)
+            }
+        } catch (e: IOException) {
+            // client disconnected
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+        } finally {
+            try { socket.close() } catch (_: IOException) {}
         }
     }
 
@@ -206,14 +253,43 @@ class HttpServer(
     }
 
     private fun handleRootRequest(out: BufferedOutputStream) {
-        val body = """<!DOCTYPE html><html><head><title>Camari</title></head><body>
-<h1>Camari Webcam Server</h1><p>Server is running on port $port</p>
-<ul><li><a href="/stream">/stream</a> - MJPEG stream (paste into OBS)</li>
-<li><a href="/health">/health</a> - Health check</li>
-<li><a href="/status">/status</a> - Status JSON</li></ul>
-</body></html>"""
-        writeResponse(out, "200 OK", "text/html", body)
-        Log.i(TAG, "Root served")
+        // This page is what OBS browser source points at.
+        // The <img> tag loads the MJPEG stream. When the stream drops (app stopped/restarted),
+        // onerror fires and retries after 1s with a cache-busted URL so OBS reconnects
+        // automatically without needing a manual refresh or OBS restart.
+        val body = """<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #000; width: 100vw; height: 100vh; overflow: hidden; }
+  img { width: 100%; height: 100%; object-fit: contain; display: block; }
+</style>
+</head>
+<body>
+<img id="s" src="/stream" style="opacity:0">
+<script>
+  var img = document.getElementById('s');
+
+  // EventSource reconnects at the network layer — not subject to CEF timer throttling.
+  // onopen  = server is up → reconnect stream and show it
+  // onerror = server went down → hide frozen frame (OBS shows black)
+  var es = new EventSource('/events');
+
+  es.onopen = function() {
+    img.src = '/stream?t=' + Date.now();
+    img.style.opacity = '1';
+  };
+
+  es.onerror = function() {
+    img.style.opacity = '0';
+  };
+</script>
+</body>
+</html>"""
+        writeResponse(out, "200 OK", "text/html; charset=utf-8", body)
+        Log.i(TAG, "Root (OBS wrapper) served")
     }
 
     private fun handleHealthCheck(out: BufferedOutputStream) {
