@@ -2,7 +2,9 @@
 
 Camari lets you use your Android phone as a webcam for OBS.
 
-Works over WiFi or mobile hotspot from your phone!. 
+Works over WiFi or mobile hotspot from your phone! 
+
+There is a debug version of this available in the [releases section](https://github.com/alexjyong/Camari/releases/tag/v1.0.0)
 
 ## OBS setup
 
