@@ -15,7 +15,7 @@ html, body {
 }
 
 .app {
-  min-height: 100vh;
+  height: 100%;
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
   color: #ffffff;
   display: flex;
@@ -23,14 +23,15 @@ html, body {
 }
 
 .app-header {
-  padding: 2rem;
+  padding: 0.5rem 1rem;
   text-align: center;
   background: rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
 }
 
 .app-header h1 {
   margin: 0;
-  font-size: 2.5rem;
+  font-size: 1.25rem;
   font-weight: 700;
   background: linear-gradient(90deg, #e94560, #ff6b6b);
   -webkit-background-clip: text;
@@ -38,18 +39,14 @@ html, body {
   background-clip: text;
 }
 
-.tagline {
-  margin: 0.5rem 0 0;
-  color: #a0a0a0;
-  font-size: 1rem;
-}
-
 .app-main {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 2rem;
+  overflow-y: auto;
 }
 
 .start-screen {
@@ -181,14 +178,3 @@ html, body {
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-.app-footer {
-  padding: 1.5rem;
-  text-align: center;
-  background: rgba(0, 0, 0, 0.2);
-}
-
-.app-footer p {
-  margin: 0;
-  color: #808080;
-  font-size: 0.85rem;
-}

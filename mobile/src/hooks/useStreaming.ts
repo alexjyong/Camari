@@ -23,6 +23,8 @@ interface UseStreamingReturn {
   isObsConnected: boolean;
   /** Whether currently starting */
   isStarting: boolean;
+  /** Whether currently stopping */
+  isStopping: boolean;
   /** Start streaming */
   startStreaming: () => Promise<void>;
   /** Stop streaming */
@@ -65,6 +67,7 @@ export function useStreaming(options: UseStreamingOptions = {}): UseStreamingRet
 
   const [session, setSession] = useState<StreamingSession | null>(null);
   const [isStarting, setIsStarting] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
   const pollIntervalRef = useRef<number | null>(null);
 
   /**
@@ -150,28 +153,29 @@ export function useStreaming(options: UseStreamingOptions = {}): UseStreamingRet
   const stopStreaming = useCallback(async () => {
     if (!session || session.status !== 'streaming') return;
 
+    setIsStopping(true);
+
     try {
       await CameraStream.stopStreaming();
-      
-      setSession(prev => prev ? {
-        ...prev,
-        status: 'stopped',
-      } : null);
-      
+
       // Stop polling
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
         pollIntervalRef.current = null;
       }
-      
-      // Reset session after delay
+
+      setSession(prev => prev ? { ...prev, status: 'stopped' } : null);
+
+      // Reset session after brief pause so "Stopping..." is visible
       setTimeout(() => {
         setSession(null);
+        setIsStopping(false);
         onStreamingStop?.();
       }, 500);
-      
+
     } catch (error) {
       console.error('Failed to stop streaming:', error);
+      setIsStopping(false);
       onError?.(error as Error);
     }
   }, [session, onStreamingStop, onError]);
@@ -201,6 +205,7 @@ export function useStreaming(options: UseStreamingOptions = {}): UseStreamingRet
     isStreaming: session?.status === 'streaming',
     isObsConnected: session?.status === 'streaming' && (session?.obsConnected ?? false),
     isStarting,
+    isStopping,
     startStreaming,
     stopStreaming,
     clearError,

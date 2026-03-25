@@ -18,6 +18,7 @@ function App() {
     isStreaming,
     isObsConnected,
     isStarting,
+    isStopping,
     startStreaming,
     stopStreaming,
     clearError,
@@ -58,7 +59,6 @@ function App() {
     <div className="app">
       <header className="app-header">
         <h1>Camari</h1>
-        <p className="tagline">Free and Open Source Android Webcam for OBS</p>
       </header>
 
       {networkStatus.connectionType === 'none' && (
@@ -87,46 +87,48 @@ function App() {
             )}
           </div>
         ) : (
-          <div className="streaming-screen">
-            <StreamingIndicator 
-              startedAt={session?.startedAt || null}
-              isStreaming={isStreaming}
-            />
+          <>
+            <div className="streaming-screen">
+              <StreamingIndicator
+                startedAt={session?.startedAt || null}
+                isStreaming={isStreaming}
+              />
 
-            <BatteryWarning 
-              batteryLevel={batteryLevel}
-              isCharging={isCharging}
-            />
+              <BatteryWarning
+                batteryLevel={batteryLevel}
+                isCharging={isCharging}
+              />
 
-            {!isObsConnected && (
-              <div className="obs-disconnected-banner">
-                ⏳ Waiting for OBS to connect — paste the URL below into an OBS Browser Source
-              </div>
-            )}
+              {!isObsConnected && (
+                <div className="obs-disconnected-banner">
+                  ⏳ Waiting for OBS to connect — paste the URL below into an OBS Browser Source
+                </div>
+              )}
 
-            <StreamUrlDisplay
-              url={session?.streamUrl || ''}
-              connectionType={networkStatus.connectionType}
-              networkSsid={networkStatus.ssid}
-            />
+              <StreamUrlDisplay
+                url={session?.streamUrl || ''}
+                connectionType={networkStatus.connectionType}
+                networkSsid={networkStatus.ssid}
+              />
 
-            <CameraSwitchButton
-              onSwitch={switchCamera}
-              currentCamera={cameraType}
-              isSwitching={isSwitching}
-            />
+              <CameraSwitchButton
+                onSwitch={switchCamera}
+                currentCamera={cameraType}
+                isSwitching={isSwitching}
+              />
+            </div>
 
-            <StopStreamingButton 
-              onStop={stopStreaming}
-              requireConfirmation={true}
-            />
-          </div>
+            <div className="stop-button-tray">
+              <StopStreamingButton
+                onStop={stopStreaming}
+                isStopping={isStopping}
+                requireConfirmation={true}
+              />
+            </div>
+          </>
         )}
       </main>
 
-      <footer className="app-footer">
-        <p>Camari: Free and Open Source Android Webcam for OBS</p>
-      </footer>
     </div>
   );
 }
