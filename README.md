@@ -1,5 +1,15 @@
 ![camari_logo_wordmark_combined](https://github.com/user-attachments/assets/b1366f8d-d68c-4a85-ab72-5a2fd717d11f)
 
+<!-- ---------- Badges ---------- -->
+[![App-Code Size](https://img.shields.io/github/languages/code-size/alexjyong/camari.svg)](https://api.github.com/repos/alexjyong/Camari)
+[![GitHub commit activity](https://img.shields.io/github/commit-activity/m/alexjyong/Camari)](https://github.com/alexjyong/Camari/pulse/monthly)
+
+[![GitHub version](https://img.shields.io/github/v/release/alexjyong/Camari?logo=github&label=Github%20version&color=white)](https://github.com/alexjyong/Camari/releases)
+
+[<img src="https://github.com/user-attachments/assets/b0218883-f6dd-4f9e-abc1-ed070c6107f2"
+alt="Get it on GitHub"
+height="80">](https://github.com/alexjyong/Camari/releases/latest/)
+
 Camari lets you use your Android phone as a webcam for OBS.
 
 Works over WiFi or mobile hotspot from your phone! 
