@@ -1,12 +1,22 @@
-name: Build Android APK
+name: Build Android Version
 
 on:
   workflow_dispatch:
+    inputs:
+      output_type:
+        description: 'Output type'
+        required: true
+        default: 'apk'
+        type: choice
+        options:
+          - apk
+          - aab
+          - both
 
 jobs:
 
   build:
-    name: Debug APK
+    name: Capacitor ${{ inputs.output_type }}
     runs-on: ubuntu-latest
 
     steps:
@@ -14,18 +24,19 @@ jobs:
 
       - uses: actions/setup-java@v5
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'temurin'
 
-      - name: Accept Android SDK licenses
+      - name: Set up Android SDK
         run: |
           SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
           yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
           "$SDKMANAGER" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          echo "$ANDROID_SDK_ROOT/build-tools/34.0.0" >> $GITHUB_PATH
 
       - uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Install dependencies
         run: |
@@ -47,17 +58,52 @@ jobs:
           cd mobile
           npx cap sync android
 
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.JKS_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+
       - name: Make gradlew executable
         run: chmod +x mobile/android/gradlew
 
-      - name: Build debug APK
+      - name: Build release APK
+        if: inputs.output_type == 'apk' || inputs.output_type == 'both'
         run: |
           cd mobile/android
-          ./gradlew assembleDebug --quiet
+          ./gradlew assembleRelease --quiet
+          apksigner sign \
+            --ks ../../keystore.jks \
+            --ks-key-alias uploadkey \
+            --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} \
+            --key-pass pass:${{ secrets.ALIAS_PASSWORD }} \
+            --out app/build/outputs/apk/release/camari-release.apk \
+            app/build/outputs/apk/release/app-release-unsigned.apk
+          apksigner verify --verbose app/build/outputs/apk/release/camari-release.apk
 
-      - name: Upload APK
+      - name: Build release AAB
+        if: inputs.output_type == 'aab' || inputs.output_type == 'both'
+        run: |
+          cd mobile/android
+          ./gradlew bundleRelease --quiet
+          jarsigner -verbose \
+            -keystore ../../keystore.jks \
+            -storepass ${{ secrets.KEYSTORE_PASSWORD }} \
+            -keypass ${{ secrets.ALIAS_PASSWORD }} \
+            app/build/outputs/bundle/release/app-release.aab uploadkey
+          mv app/build/outputs/bundle/release/app-release.aab \
+             app/build/outputs/bundle/release/camari-release.aab
+
+      - name: Upload APK artifact
+        if: inputs.output_type == 'apk' || inputs.output_type == 'both'
         uses: actions/upload-artifact@v7
         with:
-          name: camari-debug-apk
-          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          name: camari-apk
           if-no-files-found: error
+          path: mobile/android/app/build/outputs/apk/release/camari-release.apk
+
+      - name: Upload AAB artifact
+        if: inputs.output_type == 'aab' || inputs.output_type == 'both'
+        uses: actions/upload-artifact@v7
+        with:
+          name: camari-aab
+          if-no-files-found: error
+          path: mobile/android/app/build/outputs/bundle/release/camari-release.aab
