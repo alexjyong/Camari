@@ -40,7 +40,7 @@ Set up the Browser Source above, then start **Virtual Camera** from the OBS Tool
 ## Troubleshooting
 
 - **Stream frozen in OBS**: Right-click the Browser Source -> Refresh
-- **Can't connect**: Make sure your phone and computer are on the same network
+- **Can't connect**: Make sure your phone and computer are on the same network. If your phone is on a VPN, this may cause trouble.
 - **Stream stops when I lock my phone**: Camari should run as foreground server and prevent this. Buuuut, if it does, check your phone's battery optimization settings and exempt Camari.
 
 ## Building it yourself
