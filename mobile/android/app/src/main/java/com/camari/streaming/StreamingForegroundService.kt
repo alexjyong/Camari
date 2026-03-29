@@ -81,11 +81,12 @@ class StreamingForegroundService : Service() {
      * Starts camera capture and HTTP server. Updates the foreground notification with the port.
      * @return port the server is listening on, or -1 on failure
      */
-    fun startStreaming(cameraType: String, ipAddress: String): Int {
+    fun startStreaming(cameraType: String, ipAddress: String, resolution: String = "720p"): Int {
         stopStreamingInternal()
 
         val cm = CameraManager(this)
         cm.setCameraType(cameraType)
+        cm.setResolution(CameraManager.presetToSize(resolution))
         cm.startCamera()
         cameraManager = cm
 
@@ -158,6 +159,8 @@ class StreamingForegroundService : Service() {
     fun isObsConnected(): Boolean = httpServer?.isClientConnected() == true
 
     fun getCameraType(): String = cameraManager?.getCameraType() ?: "front"
+
+    fun getActualResolution(): String? = cameraManager?.getActualSize()?.let { "${it.width}x${it.height}" }
 
     fun getSessionStartTime(): Long = cameraManager?.getSessionStartTime() ?: 0L
 

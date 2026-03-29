@@ -12,6 +12,7 @@ const STREAMING_RESULT = {
   port: 8080,
   networkSsid: 'TestNet',
   cameraType: 'front' as const,
+  resolution: '1280x720',
 };
 
 describe('useStreaming', () => {
@@ -141,5 +142,124 @@ describe('useStreaming', () => {
     await act(async () => { resolve(STREAMING_RESULT); });
 
     expect(mockCameraStream.startStreaming).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('useStreaming — resolution', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    mockCameraStream.getStatus.mockResolvedValue({
+      status: 'streaming',
+      cameraType: 'front',
+      batteryLevel: 80,
+      isCharging: false,
+      isLowBattery: false,
+      connectionType: 'wifi',
+      networkSsid: 'TestNet',
+      ipAddress: '192.168.1.100',
+    });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.clearAllMocks();
+  });
+
+  it('passes the resolution option to startStreaming', async () => {
+    mockCameraStream.startStreaming.mockResolvedValue({ ...STREAMING_RESULT, resolution: '854x480' });
+
+    const { result } = renderHook(() => useStreaming({ resolution: '480p' }));
+    await act(async () => { await result.current.startStreaming(); });
+
+    expect(mockCameraStream.startStreaming).toHaveBeenCalledWith({ resolution: '480p' });
+  });
+
+  it('stores requestedResolution and actualResolution on the session', async () => {
+    mockCameraStream.startStreaming.mockResolvedValue({ ...STREAMING_RESULT, resolution: '1280x720' });
+
+    const { result } = renderHook(() => useStreaming({ resolution: '720p' }));
+    await act(async () => { await result.current.startStreaming(); });
+
+    expect(result.current.session?.requestedResolution).toBe('720p');
+    expect(result.current.session?.actualResolution).toBe('1280x720');
+  });
+
+  it('does not call onFallbackResolution when actual matches requested', async () => {
+    mockCameraStream.startStreaming.mockResolvedValue({ ...STREAMING_RESULT, resolution: '1280x720' });
+
+    const onFallbackResolution = jest.fn();
+    const { result } = renderHook(() => useStreaming({ resolution: '720p', onFallbackResolution }));
+    await act(async () => { await result.current.startStreaming(); });
+
+    expect(onFallbackResolution).not.toHaveBeenCalled();
+  });
+
+  it('calls onFallbackResolution with actual resolution when fallback is applied', async () => {
+    // User requested 1080p but device only gave 1280x720
+    mockCameraStream.startStreaming.mockResolvedValue({ ...STREAMING_RESULT, resolution: '1280x720' });
+
+    const onFallbackResolution = jest.fn();
+    const { result } = renderHook(() => useStreaming({ resolution: '1080p', onFallbackResolution }));
+    await act(async () => { await result.current.startStreaming(); });
+
+    expect(onFallbackResolution).toHaveBeenCalledWith('1280x720');
+  });
+
+  it('does not call onFallbackResolution when resolution is absent from result', async () => {
+    const resultWithoutResolution = {
+      streamUrl: 'http://192.168.1.100:8080/',
+      ipAddress: '192.168.1.100',
+      port: 8080,
+      networkSsid: 'TestNet',
+      cameraType: 'front' as const,
+    };
+    mockCameraStream.startStreaming.mockResolvedValue(resultWithoutResolution);
+
+    const onFallbackResolution = jest.fn();
+    const { result } = renderHook(() => useStreaming({ resolution: '720p', onFallbackResolution }));
+    await act(async () => { await result.current.startStreaming(); });
+
+    expect(onFallbackResolution).not.toHaveBeenCalled();
+  });
+});
+
+describe('useStreaming — localStorage persistence', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    localStorage.clear();
+    mockCameraStream.getStatus.mockResolvedValue({
+      status: 'streaming',
+      cameraType: 'front',
+      batteryLevel: 80,
+      isCharging: false,
+      isLowBattery: false,
+      connectionType: 'wifi',
+      networkSsid: 'TestNet',
+      ipAddress: '192.168.1.100',
+    });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it('passes the provided resolution to the plugin on start', async () => {
+    mockCameraStream.startStreaming.mockResolvedValue({ ...STREAMING_RESULT, resolution: '854x480' });
+
+    const { result } = renderHook(() => useStreaming({ resolution: '480p' }));
+    await act(async () => { await result.current.startStreaming(); });
+
+    expect(mockCameraStream.startStreaming).toHaveBeenCalledWith({ resolution: '480p' });
+  });
+
+  it('defaults to 720p when no resolution option is provided', async () => {
+    mockCameraStream.startStreaming.mockResolvedValue(STREAMING_RESULT);
+
+    const { result } = renderHook(() => useStreaming());
+    await act(async () => { await result.current.startStreaming(); });
+
+    expect(mockCameraStream.startStreaming).toHaveBeenCalledWith({ resolution: '720p' });
   });
 });

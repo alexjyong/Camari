@@ -9,12 +9,28 @@ import {
   StopStreamingButton,
   Toast,
   HelpScreen,
+  ResolutionPicker,
 } from './components';
+import type { ResolutionPreset } from './types/capacitor-camera-stream';
 import './App.css';
+
+const RESOLUTION_KEY = 'camari_resolution';
+const VALID_PRESETS: ResolutionPreset[] = ['480p', '720p', '1080p'];
+
+function loadResolution(): ResolutionPreset {
+  const saved = localStorage.getItem(RESOLUTION_KEY);
+  return VALID_PRESETS.includes(saved as ResolutionPreset) ? (saved as ResolutionPreset) : '720p';
+}
 
 function App() {
   const [showHelp, setShowHelp] = useState(false);
+  const [resolution, setResolution] = useState<ResolutionPreset>(loadResolution);
   const { toast, showToast, dismissToast } = useToast();
+
+  const handleResolutionChange = (preset: ResolutionPreset) => {
+    setResolution(preset);
+    localStorage.setItem(RESOLUTION_KEY, preset);
+  };
 
   const {
     session,
@@ -24,14 +40,17 @@ function App() {
     isStopping,
     startStreaming,
     stopStreaming,
-    clearError,
   } = useStreaming({
+    resolution,
     onStreamingStart: () => {},
     onStreamingStop: () => {
       showToast('Stream stopped', 'info');
     },
     onError: (error) => {
       showToast(error.message || 'Failed to start streaming', 'error');
+    },
+    onFallbackResolution: (actual: string) => {
+      showToast(`Streaming at ${actual} — your device doesn't support the selected resolution`, 'info');
     },
   });
 
@@ -56,15 +75,25 @@ function App() {
         <button className="help-button" onClick={() => setShowHelp(true)} aria-label="Help">?</button>
       </header>
 
-      {networkStatus.connectionType === 'none' && (
+      {networkStatus.connectionType === 'none' && !networkStatus.ipAddress && (
         <div className="network-warning-banner">
-          ⚠️ No local network detected. Connect to WiFi or enable your phone's hotspot; OBS needs a direct connection to your phone.
+          ⚠️ No local network detected — connect to WiFi or enable your phone's hotspot so OBS can reach your phone.
+        </div>
+      )}
+      {networkStatus.connectionType === 'hotspot' && !isStreaming && (
+        <div className="network-info-banner">
+          📡 Hotspot active — connect your OBS computer to your phone's hotspot to use this app.
         </div>
       )}
 
       <main className="app-main">
         {!isStreaming ? (
           <div className="start-screen">
+            <ResolutionPicker
+              value={resolution}
+              onChange={handleResolutionChange}
+              disabled={isStarting}
+            />
             <StartStreamingButton
               onStart={startStreaming}
               isStarting={isStarting}

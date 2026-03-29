@@ -20,7 +20,7 @@ cd mobile
 echo "=== Installing npm dependencies ==="
 npm install
 
-echo "=== Running tests ==="
+echo "=== Running TypeScript/React tests ==="
 npm test
 
 echo "=== Building TypeScript/React app ==="
@@ -35,6 +35,9 @@ if [ ! -f "gradlew" ]; then
   echo "Generating Gradle wrapper..."
   gradle wrapper || echo "Warning: Could not generate wrapper, trying to continue..."
 fi
+
+echo "=== Running Kotlin unit tests ==="
+./gradlew testDebugUnitTest
 
 echo "=== Building debug APK ==="
 ./gradlew assembleDebug

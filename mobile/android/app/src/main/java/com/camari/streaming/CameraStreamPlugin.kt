@@ -111,16 +111,18 @@ class CameraStreamPlugin : Plugin() {
             val intent = Intent(activity, StreamingForegroundService::class.java)
             activity.startForegroundService(intent)
 
+            val resolution = call.getString("resolution") ?: "720p"
             val ipAddress = networkStatus?.getIpAddress() ?: "192.168.1.100"
-            val port = service.startStreaming(currentCameraType, ipAddress)
+            val port = service.startStreaming(currentCameraType, ipAddress, resolution)
             if (port == -1) {
                 call.reject("Could not start server on any available port")
                 return
             }
             val ssid = networkStatus?.getNetworkSsid() ?: "WiFi"
             val streamUrl = "http://$ipAddress:$port/"
+            val actualResolution = service.getActualResolution() ?: "1280x720"
 
-            android.util.Log.i(TAG, "Streaming started: $streamUrl")
+            android.util.Log.i(TAG, "Streaming started: $streamUrl at $actualResolution")
 
             val result = JSObject()
             result.put("streamUrl", streamUrl)
@@ -128,6 +130,7 @@ class CameraStreamPlugin : Plugin() {
             result.put("port", port)
             result.put("networkSsid", ssid)
             result.put("cameraType", currentCameraType)
+            result.put("resolution", actualResolution)
             call.resolve(result)
 
         } catch (e: Exception) {
@@ -203,6 +206,7 @@ class CameraStreamPlugin : Plugin() {
             result.put("networkSsid", networkStatus?.getNetworkSsid())
             result.put("ipAddress", networkStatus?.getIpAddress())
             result.put("obsConnected", service?.isObsConnected() == true)
+            result.put("resolution", if (isStreaming) service?.getActualResolution() else null)
             call.resolve(result)
 
         } catch (e: Exception) {

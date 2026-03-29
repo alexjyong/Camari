@@ -15,6 +15,7 @@ export const CameraStream: jest.Mocked<CameraStreamPlugin> = {
     port: 8080,
     networkSsid: 'TestNet',
     cameraType: 'front' as const,
+    resolution: '1280x720',
   }),
   stopStreaming: jest.fn().mockResolvedValue(undefined),
   switchCamera: jest.fn().mockResolvedValue({ cameraType: 'back' as const, success: true }),

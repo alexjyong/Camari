@@ -19,7 +19,7 @@ export function HelpScreen({ onClose }: HelpScreenProps) {
             <li>Tap <strong>Start Streaming</strong> in Camari</li>
             <li>In OBS, add a <strong>Browser Source</strong></li>
             <li>Paste the URL from Camari into the URL field</li>
-            <li>Set width <strong>1280</strong>, height <strong>720</strong></li>
+            <li>Set the width and height to match your chosen resolution — <strong>1280 × 720</strong> for 720p (default), <strong>1920 × 1080</strong> for 1080p, <strong>854 × 480</strong> for 480p</li>
             <li>Click OK — video should appear within a few seconds</li>
           </ol>
         </section>

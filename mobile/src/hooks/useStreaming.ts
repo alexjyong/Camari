@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { CameraStream } from '../services/CameraStreamService';
 import { StreamingSession, StreamingStatus } from '../types/streaming';
 import { CameraType } from '../types/camera';
+import type { ResolutionPreset } from '../types/capacitor-camera-stream';
 
 interface UseStreamingOptions {
   /** Callback when streaming starts */
@@ -10,8 +11,12 @@ interface UseStreamingOptions {
   onStreamingStop?: () => void;
   /** Callback when error occurs */
   onError?: (error: Error) => void;
+  /** Called when the native layer applied a fallback resolution different from what was requested */
+  onFallbackResolution?: (actual: string) => void;
   /** Polling interval for status updates (ms) */
   statusPollInterval?: number;
+  /** Resolution preset to stream at */
+  resolution?: ResolutionPreset;
 }
 
 interface UseStreamingReturn {
@@ -50,8 +55,16 @@ function createInitialSession(): StreamingSession {
     batteryLevel: 0,
     networkSsid: null,
     obsConnected: false,
+    requestedResolution: null,
+    actualResolution: null,
     errorMessage: null,
   };
+}
+
+/** Returns the height label (e.g. "720p") for an "WxH" actual resolution string. */
+function actualToLabel(actual: string): string {
+  const height = actual.split('x')[1];
+  return height ? `${height}p` : actual;
 }
 
 /**
@@ -62,7 +75,9 @@ export function useStreaming(options: UseStreamingOptions = {}): UseStreamingRet
     onStreamingStart,
     onStreamingStop,
     onError,
+    onFallbackResolution,
     statusPollInterval = 1000,
+    resolution = '720p',
   } = options;
 
   const [session, setSession] = useState<StreamingSession | null>(null);
@@ -76,12 +91,12 @@ export function useStreaming(options: UseStreamingOptions = {}): UseStreamingRet
   const refreshStatus = useCallback(async () => {
     try {
       const status = await CameraStream.getStatus();
-      
+
       setSession(prev => {
         if (!prev) return prev;
-        
+
         const newStatus: StreamingStatus = status.status as StreamingStatus;
-        
+
         return {
           ...prev,
           status: newStatus,
@@ -92,6 +107,7 @@ export function useStreaming(options: UseStreamingOptions = {}): UseStreamingRet
           networkSsid: status.networkSsid,
           ipAddress: status.ipAddress,
           obsConnected: status.obsConnected ?? false,
+          actualResolution: status.resolution ?? prev.actualResolution,
           errorMessage: status.errorMessage || null,
         };
       });
@@ -109,8 +125,8 @@ export function useStreaming(options: UseStreamingOptions = {}): UseStreamingRet
     setIsStarting(true);
 
     try {
-      const result = await CameraStream.startStreaming();
-      
+      const result = await CameraStream.startStreaming({ resolution });
+
       const newSession: StreamingSession = {
         sessionId: crypto.randomUUID(),
         status: 'streaming',
@@ -122,29 +138,39 @@ export function useStreaming(options: UseStreamingOptions = {}): UseStreamingRet
         batteryLevel: 0,
         networkSsid: result.networkSsid,
         obsConnected: false,
+        requestedResolution: resolution,
+        actualResolution: result.resolution ?? null,
         errorMessage: null,
       };
 
       setSession(newSession);
       onStreamingStart?.(newSession);
 
+      // Notify if the native layer applied a fallback resolution
+      if (result.resolution) {
+        const actualLabel = actualToLabel(result.resolution);
+        if (actualLabel !== resolution) {
+          onFallbackResolution?.(result.resolution);
+        }
+      }
+
       // Start polling for status updates
       pollIntervalRef.current = window.setInterval(refreshStatus, statusPollInterval);
-      
+
     } catch (error) {
-      
+
       const errorSession: StreamingSession = {
         ...createInitialSession(),
         status: 'error',
         errorMessage: error instanceof Error ? error.message : 'Unknown error',
       };
-      
+
       setSession(errorSession);
       onError?.(error as Error);
     } finally {
       setIsStarting(false);
     }
-  }, [isStarting, session?.status, onStreamingStart, onError, refreshStatus, statusPollInterval]);
+  }, [isStarting, session?.status, resolution, onStreamingStart, onError, onFallbackResolution, refreshStatus, statusPollInterval]);
 
   /**
    * Stop streaming session.

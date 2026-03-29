@@ -14,7 +14,7 @@ You'll need [OBS Studio](https://obsproject.com/) installed on your computer fir
 2. Install Camari on your Android phone and open it.
 3. Tap **Start Streaming** — you'll see a URL like `http://192.168.1.x:8080/`
 4. In OBS, add a **Browser Source**
-5. Paste that URL into the URL field, set width to **1280** and height to **720**
+5. Paste that URL into the URL field. Set the width and height to match the resolution you picked in the app — **1280 × 720** for 720p (default), **1920 × 1080** for 1080p, or **854 × 480** for 480p
 6. Click OK
 
 That's it. Video should appear within a couple seconds.

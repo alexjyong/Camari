@@ -43,10 +43,18 @@ jobs:
           cd mobile
           npm install
 
-      - name: Run tests
+      - name: Run TypeScript/React tests
         run: |
           cd mobile
           npm test
+
+      - name: Make gradlew executable
+        run: chmod +x mobile/android/gradlew
+
+      - name: Run Kotlin unit tests
+        run: |
+          cd mobile/android
+          ./gradlew testDebugUnitTest
 
       - name: Build web app
         run: |
@@ -61,9 +69,6 @@ jobs:
       - name: Decode keystore
         run: |
           echo "${{ secrets.JKS_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
-
-      - name: Make gradlew executable
-        run: chmod +x mobile/android/gradlew
 
       - name: Build release APK
         if: inputs.output_type == 'apk' || inputs.output_type == 'both'

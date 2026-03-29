@@ -69,6 +69,7 @@ describe('App', () => {
       port: 8080,
       networkSsid: 'TestNet',
       cameraType: 'front',
+      resolution: '1280x720',
     });
 
     await act(async () => { render(<App />); });
