@@ -1,10 +1,22 @@
 ![camari_logo_wordmark_combined](https://github.com/user-attachments/assets/b1366f8d-d68c-4a85-ab72-5a2fd717d11f)
 
+<!-- ---------- Badges ---------- -->
+[![App-Code Size](https://img.shields.io/github/languages/code-size/alexjyong/camari.svg)](https://api.github.com/repos/alexjyong/Camari)
+[![GitHub commit activity](https://img.shields.io/github/commit-activity/m/alexjyong/Camari)](https://github.com/alexjyong/Camari/pulse/monthly)
+
+[![GitHub version](https://img.shields.io/github/v/release/alexjyong/Camari?logo=github&label=Github%20version&color=white)](https://github.com/alexjyong/Camari/releases)
+
+[<img src="https://github.com/user-attachments/assets/b0218883-f6dd-4f9e-abc1-ed070c6107f2"
+alt="Get it on GitHub"
+height="80">](https://github.com/alexjyong/Camari/releases/latest/)
+
 Camari lets you use your Android phone as a webcam for OBS.
 
 Works over WiFi or mobile hotspot from your phone! 
 
-There is a debug version of this available in the [releases section](https://github.com/alexjyong/Camari/releases/tag/v1.0.0)
+You can download this in the [releases section](https://github.com/alexjyong/Camari/releases/tag/v1.0.0)
+
+F-Droid and other app store support coming soon!
 
 ## OBS setup
 
@@ -29,7 +41,7 @@ Set up the Browser Source above, then start **Virtual Camera** from the OBS Tool
 
 - **Stream never shows up in OBS after starting**: Click on the Browser source in OBS and select refresh. You may have to do this a couple of times
 - **Stream frozen in OBS**: Click on the Browser source in OBS and select refresh.
-- **Can't connect**: Make sure your phone and computer are on the same network
+- **Can't connect**: Make sure your phone and computer are on the same network. If your phone is on a VPN, this may cause trouble, recommend taking your phone off VPN in the meantime.
 - **Stream stops when I lock my phone**: Camari should run as foreground server and prevent this. Buuuut, if it does, check your phone's battery optimization settings and exempt Camari.
 
 ## Building it yourself
