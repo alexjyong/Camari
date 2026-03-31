@@ -77,12 +77,12 @@ function App() {
 
       {networkStatus.connectionType === 'none' && !networkStatus.ipAddress && (
         <div className="network-warning-banner">
-          ⚠️ No local network detected — connect to WiFi or enable your phone's hotspot so OBS can reach your phone.
+          No local network detected — connect to WiFi or enable your phone's hotspot so OBS can reach your phone.
         </div>
       )}
       {networkStatus.connectionType === 'hotspot' && !isStreaming && (
         <div className="network-info-banner">
-          📡 Hotspot active — connect your OBS computer to your phone's hotspot to use this app.
+          Hotspot active — connect your OBS computer to your phone's hotspot to use this app.
         </div>
       )}
 
@@ -115,7 +115,7 @@ function App() {
 
               {!isObsConnected && (
                 <div className="obs-disconnected-banner">
-                  ⏳ Waiting for OBS to connect — paste the URL below into an OBS Browser Source
+                  Waiting for OBS to connect — paste the URL below into an OBS Browser Source
                 </div>
               )}
 

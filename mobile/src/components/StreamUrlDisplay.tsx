@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Wifi, Radio } from 'lucide-react';
 import './StreamUrlDisplay.css';
 
 interface StreamUrlDisplayProps {
@@ -44,12 +45,12 @@ export function StreamUrlDisplay({
       <div className="network-info">
         {connectionType === 'wifi' && networkSsid ? (
           <>
-            <span className="network-icon">📶</span>
+            <Wifi size={14} className="network-icon" aria-hidden="true" />
             <span>OBS must be on <strong>{networkSsid}</strong> WiFi</span>
           </>
         ) : connectionType === 'hotspot' ? (
           <>
-            <span className="network-icon">📡</span>
+            <Radio size={14} className="network-icon" aria-hidden="true" />
             <span>Connect your OBS computer to your phone's hotspot</span>
           </>
         ) : null}

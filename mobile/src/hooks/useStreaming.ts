@@ -97,6 +97,12 @@ export function useStreaming(options: UseStreamingOptions = {}): UseStreamingRet
 
         const newStatus: StreamingStatus = status.status as StreamingStatus;
 
+        const newIp = status.ipAddress ?? null;
+        const streamUrl =
+          newIp && prev.port
+            ? `http://${newIp}:${prev.port}/stream`
+            : prev.streamUrl;
+
         return {
           ...prev,
           status: newStatus,
@@ -105,7 +111,8 @@ export function useStreaming(options: UseStreamingOptions = {}): UseStreamingRet
           isCharging: status.isCharging,
           isLowBattery: status.isLowBattery,
           networkSsid: status.networkSsid,
-          ipAddress: status.ipAddress,
+          ipAddress: newIp,
+          streamUrl,
           obsConnected: status.obsConnected ?? false,
           actualResolution: status.resolution ?? prev.actualResolution,
           errorMessage: status.errorMessage || null,

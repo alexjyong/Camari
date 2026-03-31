@@ -38,7 +38,7 @@ export function HelpScreen({ onClose }: HelpScreenProps) {
           <ul>
             <li>Your phone and computer need to be on the <strong>same WiFi network</strong></li>
             <li>No WiFi? Enable your phone's hotspot and connect your computer to it</li>
-            <li>Stream frozen in OBS? Right-click the source → <strong>Refresh</strong></li>
+            <li>Stream frozen in OBS? Stream not showing up? Click on Browser Source and click on the <strong>Refresh</strong> button</li>
             <li>Can't connect at all? Check that your phone's firewall isn't blocking port 8080</li>
           </ul>
         </section>

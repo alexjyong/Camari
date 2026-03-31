@@ -263,3 +263,44 @@ describe('useStreaming — localStorage persistence', () => {
     expect(mockCameraStream.startStreaming).toHaveBeenCalledWith({ resolution: '720p' });
   });
 });
+
+describe('useStreaming — IP address change updates streamUrl', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    mockCameraStream.startStreaming.mockResolvedValue({
+      ...STREAMING_RESULT,
+      streamUrl: 'http://192.168.1.100:8080/stream',
+      ipAddress: '192.168.1.100',
+      port: 8080,
+    });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.clearAllMocks();
+  });
+
+  it('reconstructs streamUrl when IP changes after a network switch', async () => {
+    mockCameraStream.getStatus.mockResolvedValue({
+      status: 'streaming',
+      cameraType: 'front',
+      batteryLevel: 80,
+      isCharging: false,
+      isLowBattery: false,
+      connectionType: 'wifi',
+      networkSsid: 'HomeWifi',
+      ipAddress: '10.0.0.5',
+    });
+
+    const { result } = renderHook(() => useStreaming({ statusPollInterval: 1000 }));
+    await act(async () => { await result.current.startStreaming(); });
+
+    expect(result.current.session?.streamUrl).toBe('http://192.168.1.100:8080/stream');
+
+    await act(async () => { jest.advanceTimersByTime(1000); });
+    await act(async () => {});
+
+    expect(result.current.session?.ipAddress).toBe('10.0.0.5');
+    expect(result.current.session?.streamUrl).toBe('http://10.0.0.5:8080/stream');
+  });
+});
