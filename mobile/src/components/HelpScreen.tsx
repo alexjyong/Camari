@@ -40,6 +40,7 @@ export function HelpScreen({ onClose }: HelpScreenProps) {
             <li>No WiFi? Enable your phone's hotspot and connect your computer to it</li>
             <li>Stream frozen in OBS? Stream not showing up? Click on Browser Source and click on the <strong>Refresh</strong> button</li>
             <li>Can't connect at all? Check that your phone's firewall isn't blocking port 8080</li>
+            <li>VPNs on your phone may cause trouble with getting your computer to talk to Camari. Recommend not using a VPN while using Camari</li>
           </ul>
         </section>
         <section className="help-section">
