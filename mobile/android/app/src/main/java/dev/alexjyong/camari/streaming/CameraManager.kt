@@ -1,4 +1,4 @@
-package com.camari.streaming
+package dev.alexjyong.camari.streaming
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -53,11 +53,65 @@ class CameraManager(private val context: Context) {
     // Additional CW rotation selected by the user (0, 90, 180, 270)
     @Volatile private var userRotationDegrees = 0
 
+    // Target capture dimensions — set via setResolution() before startCamera()
+    @Volatile private var targetSize = Size(1280, 720)
+
     companion object {
         private const val TAG = "CameraManager"
-        private const val TARGET_WIDTH = 1280
-        private const val TARGET_HEIGHT = 720
         private const val JPEG_QUALITY: Byte = 85
+
+        /**
+         * Maps a resolution preset label to a (width, height) pair.
+         * Returns plain Kotlin types so this can be tested without Android framework stubs.
+         */
+        internal fun presetToDimensions(preset: String): Pair<Int, Int> = when (preset) {
+            "480p"  -> Pair(854, 480)
+            "1080p" -> Pair(1920, 1080)
+            else    -> Pair(1280, 720) // "720p" and unknown → default
+        }
+
+        /** Converts a preset label directly to an android.util.Size. */
+        fun presetToSize(preset: String): Size = presetToDimensions(preset).let { (w, h) -> Size(w, h) }
+
+        /**
+         * Choose the best (width, height) from [available] for the given [target] dimensions.
+         * Pure Kotlin — no android.util.Size — so this can be unit-tested on the JVM.
+         *
+         * Priority:
+         * 1. Exact match
+         * 2. Largest size whose width ≤ target.first and height ≤ target.second
+         * 3. Closest by Euclidean distance (fallback for "nothing fits within bounds")
+         */
+        internal fun chooseBestDimensions(
+            available: List<Pair<Int, Int>>,
+            target: Pair<Int, Int>
+        ): Pair<Int, Int> {
+            val (tw, th) = target
+
+            // Exact match first
+            available.firstOrNull { (w, h) -> w == tw && h == th }?.let { return it }
+
+            // Largest size within target bounds
+            available.filter { (w, h) -> w <= tw && h <= th }
+                .maxByOrNull { (w, h) -> w * h }
+                ?.let { return it }
+
+            // Closest by Euclidean distance
+            return available.minByOrNull { (w, h) ->
+                val dw = (w - tw).toLong()
+                val dh = (h - th).toLong()
+                dw * dw + dh * dh
+            } ?: target
+        }
+    }
+
+    /**
+     * Set the target capture resolution before calling startCamera().
+     * Has no effect if the camera is already open — the change applies on the next startCamera() call.
+     */
+    fun setResolution(size: Size) {
+        targetSize = size
+        Log.i(TAG, "Target resolution set to ${size.width}x${size.height}")
     }
 
     fun setCameraType(type: String) {
@@ -83,6 +137,9 @@ class CameraManager(private val context: Context) {
 
     fun isCameraOpen(): Boolean = cameraOpen
 
+    /** Returns the actual capture size negotiated with hardware, or null if camera is not open. */
+    fun getActualSize(): Size? = if (cameraOpen) imageReader?.let { Size(it.width, it.height) } else null
+
     fun getSessionStartTime(): Long = sessionStartTime
 
     fun startCamera() {
@@ -98,7 +155,7 @@ class CameraManager(private val context: Context) {
                 stopCameraThread()
                 return
             }
-            val size = chooseBestSize(cameraId)
+            val size = chooseBestSize(cameraId, targetSize)
             sensorOrientation = systemCameraManager.getCameraCharacteristics(cameraId)
                 .get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
             Log.i(TAG, "Opening $currentCameraType camera ($cameraId) at ${size.width}x${size.height}, sensor=${sensorOrientation}°")
@@ -170,29 +227,16 @@ class CameraManager(private val context: Context) {
     }
 
     /**
-     * Find the best JPEG output size ≤ 720p.
-     * Prefers 1280x720 exactly, otherwise largest size that fits within the target.
+     * Find the best JPEG output size for the given target using Camera2's configuration map.
+     * Delegates size-selection logic to [chooseBestDimensions] (pure, testable).
      */
-    private fun chooseBestSize(cameraId: String): Size {
+    internal fun chooseBestSize(cameraId: String, target: Size): Size {
         val map = systemCameraManager.getCameraCharacteristics(cameraId)
             .get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)!!
-        val sizes = map.getOutputSizes(ImageFormat.JPEG)
-
-        // Exact match first
-        sizes.firstOrNull { it.width == TARGET_WIDTH && it.height == TARGET_HEIGHT }
-            ?.let { return it }
-
-        // Largest size that fits within our target
-        sizes.filter { it.width <= TARGET_WIDTH && it.height <= TARGET_HEIGHT }
-            .maxByOrNull { it.width * it.height }
-            ?.let { return it }
-
-        // Fallback: closest by area
-        return sizes.minByOrNull {
-            val dw = (it.width - TARGET_WIDTH).toLong()
-            val dh = (it.height - TARGET_HEIGHT).toLong()
-            dw * dw + dh * dh
-        } ?: Size(TARGET_WIDTH, TARGET_HEIGHT)
+        val available = map.getOutputSizes(ImageFormat.JPEG)
+            .map { Pair(it.width, it.height) }
+        val (w, h) = chooseBestDimensions(available, Pair(target.width, target.height))
+        return Size(w, h)
     }
 
     @SuppressLint("MissingPermission") // Permission is checked by CameraStreamPlugin before calling startCamera()

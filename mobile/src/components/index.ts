@@ -10,3 +10,4 @@ export { BatteryWarning } from './BatteryWarning';
 export { StopStreamingButton } from './StopStreamingButton';
 export { Toast } from './Toast';
 export { HelpScreen } from './HelpScreen';
+export { ResolutionPicker } from './ResolutionPicker';

@@ -1,9 +1,9 @@
-package com.camari.webcam
+package dev.alexjyong.camari
 
 import android.os.Bundle
 import android.view.WindowManager
 import com.getcapacitor.BridgeActivity
-import com.camari.streaming.CameraStreamPlugin
+import dev.alexjyong.camari.streaming.CameraStreamPlugin
 
 class MainActivity : BridgeActivity() {
 

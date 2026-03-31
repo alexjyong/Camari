@@ -1,4 +1,4 @@
-package com.camari.streaming
+package dev.alexjyong.camari.streaming
 
 import android.Manifest
 import android.content.ComponentName
@@ -6,7 +6,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
@@ -15,8 +17,8 @@ import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
 import com.getcapacitor.annotation.Permission
 import com.getcapacitor.annotation.PermissionCallback
-import com.camari.network.NetworkStatus
-import com.camari.network.BatteryMonitor
+import dev.alexjyong.camari.network.NetworkStatus
+import dev.alexjyong.camari.network.BatteryMonitor
 
 /**
  * Capacitor plugin for camera streaming to OBS via HTTP server.
@@ -111,16 +113,18 @@ class CameraStreamPlugin : Plugin() {
             val intent = Intent(activity, StreamingForegroundService::class.java)
             activity.startForegroundService(intent)
 
+            val resolution = call.getString("resolution") ?: "720p"
             val ipAddress = networkStatus?.getIpAddress() ?: "192.168.1.100"
-            val port = service.startStreaming(currentCameraType, ipAddress)
+            val port = service.startStreaming(currentCameraType, ipAddress, resolution)
             if (port == -1) {
                 call.reject("Could not start server on any available port")
                 return
             }
             val ssid = networkStatus?.getNetworkSsid() ?: "WiFi"
             val streamUrl = "http://$ipAddress:$port/"
+            val actualResolution = service.getActualResolution() ?: "1280x720"
 
-            android.util.Log.i(TAG, "Streaming started: $streamUrl")
+            android.util.Log.i(TAG, "Streaming started: $streamUrl at $actualResolution")
 
             val result = JSObject()
             result.put("streamUrl", streamUrl)
@@ -128,6 +132,7 @@ class CameraStreamPlugin : Plugin() {
             result.put("port", port)
             result.put("networkSsid", ssid)
             result.put("cameraType", currentCameraType)
+            result.put("resolution", actualResolution)
             call.resolve(result)
 
         } catch (e: Exception) {
@@ -203,6 +208,7 @@ class CameraStreamPlugin : Plugin() {
             result.put("networkSsid", networkStatus?.getNetworkSsid())
             result.put("ipAddress", networkStatus?.getIpAddress())
             result.put("obsConnected", service?.isObsConnected() == true)
+            result.put("resolution", if (isStreaming) service?.getActualResolution() else null)
             call.resolve(result)
 
         } catch (e: Exception) {
@@ -224,8 +230,28 @@ class CameraStreamPlugin : Plugin() {
         if (hasCameraPermission()) {
             startStreaming(call)
         } else {
-            call.reject("Camera permission denied")
+            // shouldShowRequestPermissionRationale returns false after the user has ticked
+            // "Don't ask again", meaning the system won't show the dialog anymore.
+            val permanentlyDenied = !ActivityCompat.shouldShowRequestPermissionRationale(
+                activity, Manifest.permission.CAMERA
+            )
+            if (permanentlyDenied) {
+                call.reject("CAMERA_PERMISSION_PERMANENTLY_DENIED")
+            } else {
+                call.reject("Camera permission denied")
+            }
         }
+    }
+
+    @PluginMethod
+    fun openAppSettings(call: PluginCall) {
+        val intent = Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package", activity.packageName, null)
+        )
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        activity.startActivity(intent)
+        call.resolve()
     }
 
     /**

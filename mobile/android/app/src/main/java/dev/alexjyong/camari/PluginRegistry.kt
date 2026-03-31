@@ -1,4 +1,4 @@
-package com.camari.webcam
+package dev.alexjyong.camari
 
 import com.getcapacitor.Plugin
 import java.util.*
@@ -15,7 +15,7 @@ class PluginRegistry {
          */
         fun getPlugins(): Set<Class<out Plugin>> {
             return setOf(
-                com.camari.streaming.CameraStreamPlugin::class.java
+                dev.alexjyong.camari.streaming.CameraStreamPlugin::class.java
             )
         }
     }

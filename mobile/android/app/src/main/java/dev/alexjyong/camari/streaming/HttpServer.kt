@@ -1,4 +1,4 @@
-package com.camari.streaming
+package dev.alexjyong.camari.streaming
 
 import android.util.Log
 import java.io.BufferedOutputStream

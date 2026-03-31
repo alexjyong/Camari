@@ -31,6 +31,10 @@ export interface StreamingSession {
   networkSsid: string | null;
   /** Whether OBS browser source is currently connected to the stream */
   obsConnected: boolean;
+  /** Resolution preset the user requested (e.g. '720p') */
+  requestedResolution: string | null;
+  /** Actual resolution negotiated with camera hardware (e.g. '1280x720') */
+  actualResolution: string | null;
   /** Error message if status is 'error' */
   errorMessage: string | null;
 }

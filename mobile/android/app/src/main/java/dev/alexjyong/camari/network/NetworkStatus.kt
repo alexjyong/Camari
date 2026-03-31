@@ -1,4 +1,4 @@
-package com.camari.network
+package dev.alexjyong.camari.network
 
 import android.content.Context
 import android.net.ConnectivityManager
@@ -17,8 +17,14 @@ import java.net.NetworkInterface
  *
  * Supports three modes:
  * - WIFI: phone is connected to a WiFi access point as a client
- * - HOTSPOT: phone is the access point; a PC connecting to it can reach the HTTP server
- * - NONE: cellular only or no network ;  OBS cannot connect
+ * - HOTSPOT: phone is the access point (or USB/Bluetooth tethering); a PC on the same
+ *            local network can reach the HTTP server
+ * - NONE: cellular only or no network — OBS cannot connect
+ *
+ * Hotspot detection does NOT use hidden Android APIs (WifiManager.isWifiApEnabled was
+ * restricted in Android 9+). Instead it scans NetworkInterface to find any UP,
+ * non-loopback, non-cellular interface with an IPv4 address, which indicates an active
+ * hotspot, USB tethering, or Bluetooth tethering session.
  */
 class NetworkStatus(private val context: Context) {
 
@@ -31,7 +37,33 @@ class NetworkStatus(private val context: Context) {
 
     companion object {
         private const val TAG = "NetworkStatus"
-        private const val RECONNECT_TIMEOUT_MS = 60_000L
+
+        /**
+         * Returns true if the interface name belongs to a cellular/mobile-data interface
+         * that should never be treated as a local network for streaming.
+         *
+         * Extracted as a companion function so it can be unit-tested without Android stubs.
+         *
+         * Prefixes covered:
+         * - rmnet*    Qualcomm cellular (AOSP, most Android devices)
+         * - ccmni*    MediaTek cellular
+         * - pdp*      Legacy cellular
+         * - dummy*    Kernel dummy interface
+         * - sit*      IPv6-in-IPv4 tunnel
+         * - tun*      VPN tunnel
+         * - ppp*      PPP (legacy cellular / VPN)
+         */
+        internal fun isCellularInterfaceName(name: String): Boolean {
+            val n = name.lowercase()
+            return n == "lo" ||
+                   n.startsWith("rmnet") ||
+                   n.startsWith("ccmni") ||
+                   n.startsWith("pdp") ||
+                   n.startsWith("dummy") ||
+                   n.startsWith("sit") ||
+                   n.startsWith("tun") ||
+                   n.startsWith("ppp")
+        }
     }
 
     init {
@@ -43,8 +75,17 @@ class NetworkStatus(private val context: Context) {
     // -------------------------------------------------------------------------
 
     fun getConnectionType(): ConnectionType {
+        // Check WiFi client mode first — most common happy path.
         if (isWifiClient()) return ConnectionType.WIFI
-        if (isHotspotEnabled()) return ConnectionType.HOTSPOT
+
+        // Scan network interfaces for any active hotspot/tethering interface.
+        if (isHotspotActive()) return ConnectionType.HOTSPOT
+
+        // IP-address safety net: if the phone has a routable IPv4 address even though
+        // neither check above fired (e.g. interface name not in our known sets, or
+        // Android restricted the API), the phone IS reachable on a local network.
+        if (getIpAddress() != null) return ConnectionType.HOTSPOT
+
         return ConnectionType.NONE
     }
 
@@ -57,7 +98,7 @@ class NetworkStatus(private val context: Context) {
 
     /**
      * SSID of the WiFi network the phone is connected to, or null if on hotspot / no WiFi.
-     * Returns null in hotspot mode ;  use getConnectionType() to distinguish.
+     * Returns null in hotspot mode — use getConnectionType() to distinguish.
      */
     fun getNetworkSsid(): String? {
         if (!isWifiClient()) return null
@@ -67,7 +108,7 @@ class NetworkStatus(private val context: Context) {
 
     /**
      * The phone's IP address on the local network.
-     * Uses NetworkInterface enumeration ;  works for WiFi client, hotspot, and USB tethering.
+     * Uses NetworkInterface enumeration — works for WiFi client, hotspot, and USB tethering.
      */
     fun getIpAddress(): String? {
         return try {
@@ -102,9 +143,33 @@ class NetworkStatus(private val context: Context) {
     // -------------------------------------------------------------------------
 
     /**
-     * `WifiManager.isWifiApEnabled()` is a hidden API so we call it via reflection.
-     * Returns false if the method is unavailable (future Android versions).
+     * Detects active hotspot or tethering by scanning network interfaces.
+     *
+     * Only called when isWifiClient() is false, so the WiFi client interface (wlan0 in
+     * client mode) won't have an active IP and won't cause false positives.
+     *
+     * Covers WiFi hotspot (ap0, softap0, wlan0 in AP mode, swlan0 on Samsung),
+     * USB tethering (rndis0, usb0), and Bluetooth tethering (bt-pan).
      */
+    private fun isHotspotActive(): Boolean {
+        return try {
+            NetworkInterface.getNetworkInterfaces()
+                ?.asSequence()
+                ?.filter { iface ->
+                    iface.isUp &&
+                    !iface.isLoopback &&
+                    !isCellularInterfaceName(iface.name) &&
+                    iface.inetAddresses.asSequence()
+                        .filterIsInstance<Inet4Address>()
+                        .any { !it.isLoopbackAddress }
+                }
+                ?.any() ?: false
+        } catch (e: Exception) {
+            Log.w(TAG, "isHotspotActive scan failed: ${e.message}")
+            false
+        }
+    }
+
     /**
      * Returns the current WifiInfo.
      * API 31+: retrieved from NetworkCapabilities.transportInfo (non-deprecated path).
@@ -118,15 +183,6 @@ class NetworkStatus(private val context: Context) {
         } else {
             @Suppress("DEPRECATION")
             wifiManager.connectionInfo
-        }
-    }
-
-    private fun isHotspotEnabled(): Boolean {
-        return try {
-            wifiManager.javaClass.getMethod("isWifiApEnabled").invoke(wifiManager) as Boolean
-        } catch (e: Exception) {
-            Log.w(TAG, "isWifiApEnabled unavailable: ${e.message}")
-            false
         }
     }
 

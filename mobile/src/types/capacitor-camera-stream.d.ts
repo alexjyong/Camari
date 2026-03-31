@@ -2,13 +2,20 @@
  * Type declarations for the custom CameraStream Capacitor plugin.
  */
 
+export type ResolutionPreset = '480p' | '720p' | '1080p';
+
 export interface CameraStreamPlugin {
-  startStreaming(): Promise<StartStreamingResult>;
+  startStreaming(options?: StartStreamingOptions): Promise<StartStreamingResult>;
   stopStreaming(): Promise<void>;
   switchCamera(): Promise<SwitchCameraResult>;
   setOrientation(options: { degrees: number }): Promise<void>;
   getStatus(): Promise<GetStatusResult>;
+  openAppSettings(): Promise<void>;
   addListener(eventName: string, listenerFunc: (...args: any[]) => any): Promise<PluginListenerHandle>;
+}
+
+export interface StartStreamingOptions {
+  resolution?: ResolutionPreset;
 }
 
 export interface StartStreamingResult {
@@ -17,6 +24,7 @@ export interface StartStreamingResult {
   port: number;
   networkSsid: string;
   cameraType: 'front' | 'back';
+  resolution?: string;
 }
 
 export interface SwitchCameraResult {
@@ -34,6 +42,7 @@ export interface GetStatusResult {
   networkSsid: string | null;
   ipAddress: string | null;
   obsConnected?: boolean;
+  resolution?: string;
   errorMessage?: string;
 }
 

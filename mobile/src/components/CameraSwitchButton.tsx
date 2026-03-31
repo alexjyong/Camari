@@ -1,3 +1,4 @@
+import { SwitchCamera } from 'lucide-react';
 import './CameraSwitchButton.css';
 
 interface CameraSwitchButtonProps {
@@ -26,7 +27,6 @@ export function CameraSwitchButton({
     }
   };
 
-  const icon = currentCamera === 'front' ? '🤳' : '📷';
   const label = currentCamera === 'front' ? 'Front Camera' : 'Rear Camera';
 
   return (
@@ -37,7 +37,7 @@ export function CameraSwitchButton({
       aria-label={`Switch from ${label}`}
     >
       <span className="button-content">
-        <span className="icon">{icon}</span>
+        <SwitchCamera size={18} className="icon" aria-hidden="true" />
         <span className="label">{label}</span>
         {isSwitching && <span className="spinner"></span>}
       </span>

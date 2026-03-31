@@ -9,14 +9,17 @@ export const CameraStream = registerPlugin<CameraStreamPlugin>('CameraStream', {
   web: () => {
     // Web implementation (stub for development)
     return {
-      async startStreaming() {
-        console.log('[CameraStream.web] startStreaming (stub)');
+      async startStreaming(options?: { resolution?: string }) {
+        const res = options?.resolution ?? '720p';
+        const sizeMap: Record<string, string> = { '480p': '854x480', '720p': '1280x720', '1080p': '1920x1080' };
+        console.log('[CameraStream.web] startStreaming (stub):', res);
         return {
           streamUrl: 'http://192.168.1.100:8080/stream',
           ipAddress: '192.168.1.100',
           port: 8080,
           networkSsid: 'TestWiFi',
           cameraType: 'front' as const,
+          resolution: sizeMap[res] ?? '1280x720',
         };
       },
       async stopStreaming() {
@@ -40,6 +43,9 @@ export const CameraStream = registerPlugin<CameraStreamPlugin>('CameraStream', {
           ipAddress: null,
           obsConnected: false,
         };
+      },
+      async openAppSettings() {
+        console.log('[CameraStream.web] openAppSettings (stub)');
       },
       async addListener(eventName: string, listenerFunc: (...args: any[]) => any) {
         console.log('[CameraStream.web] addListener:', eventName);
