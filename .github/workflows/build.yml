@@ -48,14 +48,6 @@ jobs:
           cd mobile
           npm test
 
-      - name: Make gradlew executable
-        run: chmod +x mobile/android/gradlew
-
-      - name: Run Kotlin unit tests
-        run: |
-          cd mobile/android
-          ./gradlew testDebugUnitTest
-
       - name: Build web app
         run: |
           cd mobile
@@ -65,6 +57,14 @@ jobs:
         run: |
           cd mobile
           npx cap sync android
+
+      - name: Make gradlew executable
+        run: chmod +x mobile/android/gradlew
+
+      - name: Run Kotlin unit tests
+        run: |
+          cd mobile/android
+          ./gradlew testDebugUnitTest
 
       - name: Decode keystore
         run: |
