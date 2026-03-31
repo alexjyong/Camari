@@ -6,7 +6,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
@@ -228,8 +230,28 @@ class CameraStreamPlugin : Plugin() {
         if (hasCameraPermission()) {
             startStreaming(call)
         } else {
-            call.reject("Camera permission denied")
+            // shouldShowRequestPermissionRationale returns false after the user has ticked
+            // "Don't ask again", meaning the system won't show the dialog anymore.
+            val permanentlyDenied = !ActivityCompat.shouldShowRequestPermissionRationale(
+                activity, Manifest.permission.CAMERA
+            )
+            if (permanentlyDenied) {
+                call.reject("CAMERA_PERMISSION_PERMANENTLY_DENIED")
+            } else {
+                call.reject("Camera permission denied")
+            }
         }
+    }
+
+    @PluginMethod
+    fun openAppSettings(call: PluginCall) {
+        val intent = Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package", activity.packageName, null)
+        )
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        activity.startActivity(intent)
+        call.resolve()
     }
 
     /**

@@ -10,6 +10,7 @@ export interface CameraStreamPlugin {
   switchCamera(): Promise<SwitchCameraResult>;
   setOrientation(options: { degrees: number }): Promise<void>;
   getStatus(): Promise<GetStatusResult>;
+  openAppSettings(): Promise<void>;
   addListener(eventName: string, listenerFunc: (...args: any[]) => any): Promise<PluginListenerHandle>;
 }
 

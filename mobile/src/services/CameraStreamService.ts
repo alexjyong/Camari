@@ -44,6 +44,9 @@ export const CameraStream = registerPlugin<CameraStreamPlugin>('CameraStream', {
           obsConnected: false,
         };
       },
+      async openAppSettings() {
+        console.log('[CameraStream.web] openAppSettings (stub)');
+      },
       async addListener(eventName: string, listenerFunc: (...args: any[]) => any) {
         console.log('[CameraStream.web] addListener:', eventName);
         return { remove: () => {} };

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStreaming, useBattery, useCamera, useNetworkStatus, useToast } from './hooks';
+import { CameraStream } from './services/CameraStreamService';
 import {
   StartStreamingButton,
   StreamUrlDisplay,
@@ -24,6 +25,18 @@ function loadResolution(): ResolutionPreset {
 
 function App() {
   const [showHelp, setShowHelp] = useState(false);
+  const [cameraPermDenied, setCameraPermDenied] = useState(false);
+
+  useEffect(() => {
+    if (!cameraPermDenied) return;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        setCameraPermDenied(false);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [cameraPermDenied]);
   const [resolution, setResolution] = useState<ResolutionPreset>(loadResolution);
   const { toast, showToast, dismissToast } = useToast();
 
@@ -47,7 +60,11 @@ function App() {
       showToast('Stream stopped', 'info');
     },
     onError: (error) => {
-      showToast(error.message || 'Failed to start streaming', 'error');
+      if (error.message === 'CAMERA_PERMISSION_PERMANENTLY_DENIED') {
+        setCameraPermDenied(true);
+      } else {
+        showToast(error.message || 'Failed to start streaming', 'error');
+      }
     },
     onFallbackResolution: (actual: string) => {
       showToast(`Streaming at ${actual} — your device doesn't support the selected resolution`, 'info');
@@ -83,6 +100,18 @@ function App() {
       {networkStatus.connectionType === 'hotspot' && !isStreaming && (
         <div className="network-info-banner">
           Hotspot active — connect your OBS computer to your phone's hotspot to use this app.
+        </div>
+      )}
+
+      {cameraPermDenied && (
+        <div className="permission-denied-banner">
+          Camera access was denied. Enable it in Settings to use Camari.
+          <button
+            className="permission-settings-button"
+            onClick={() => CameraStream.openAppSettings()}
+          >
+            Open Settings
+          </button>
         </div>
       )}
 

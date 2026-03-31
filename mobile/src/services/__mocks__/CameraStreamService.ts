@@ -31,5 +31,6 @@ export const CameraStream: jest.Mocked<CameraStreamPlugin> = {
     ipAddress: '192.168.1.100',
     obsConnected: false,
   }),
+  openAppSettings: jest.fn().mockResolvedValue(undefined),
   addListener: jest.fn().mockResolvedValue({ remove: jest.fn() }),
 };
