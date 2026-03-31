@@ -1,6 +1,6 @@
-package com.camari.streaming
+package dev.alexjyong.camari.streaming
 
-import com.camari.network.NetworkStatus
+import dev.alexjyong.camari.network.NetworkStatus
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

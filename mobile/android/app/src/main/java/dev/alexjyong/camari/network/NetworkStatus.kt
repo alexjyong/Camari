@@ -1,4 +1,4 @@
-package com.camari.network
+package dev.alexjyong.camari.network
 
 import android.content.Context
 import android.net.ConnectivityManager

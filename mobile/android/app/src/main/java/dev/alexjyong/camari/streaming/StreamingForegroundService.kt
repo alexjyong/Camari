@@ -1,4 +1,4 @@
-package com.camari.streaming
+package dev.alexjyong.camari.streaming
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -11,8 +11,8 @@ import android.os.IBinder
 import android.util.Log
 import android.view.OrientationEventListener
 import androidx.core.app.NotificationCompat
-import com.camari.webcam.MainActivity
-import com.camari.webcam.R
+import dev.alexjyong.camari.MainActivity
+import dev.alexjyong.camari.R
 
 /**
  * Foreground service that owns the HttpServer and CameraManager lifecycle.

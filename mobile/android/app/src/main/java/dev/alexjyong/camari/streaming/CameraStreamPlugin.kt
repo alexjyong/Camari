@@ -1,4 +1,4 @@
-package com.camari.streaming
+package dev.alexjyong.camari.streaming
 
 import android.Manifest
 import android.content.ComponentName
@@ -15,8 +15,8 @@ import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
 import com.getcapacitor.annotation.Permission
 import com.getcapacitor.annotation.PermissionCallback
-import com.camari.network.NetworkStatus
-import com.camari.network.BatteryMonitor
+import dev.alexjyong.camari.network.NetworkStatus
+import dev.alexjyong.camari.network.BatteryMonitor
 
 /**
  * Capacitor plugin for camera streaming to OBS via HTTP server.

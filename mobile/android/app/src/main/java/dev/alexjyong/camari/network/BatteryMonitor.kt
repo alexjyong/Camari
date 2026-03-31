@@ -1,4 +1,4 @@
-package com.camari.network
+package dev.alexjyong.camari.network
 
 import android.content.BroadcastReceiver
 import android.content.Context

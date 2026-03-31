@@ -48,7 +48,7 @@
 
         <!-- Foreground service that keeps camera + HTTP server alive when app is backgrounded -->
         <service
-            android:name="com.camari.streaming.StreamingForegroundService"
+            android:name="dev.alexjyong.camari.streaming.StreamingForegroundService"
             android:foregroundServiceType="camera"
             android:exported="false" />
 
