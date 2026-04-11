@@ -118,6 +118,35 @@ jobs:
           if-no-files-found: error
           path: mobile/android/app/build/outputs/bundle/release/camari-release.aab
 
+  # ── OBS Plugin: Linux x64 ───────────────────────────────────────────────────
+  obs-linux:
+    name: OBS Plugin (Linux x64)
+    if: inputs.build_obs_plugin
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: camari-obs-plugin
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y cmake ninja-build
+
+      - name: Configure
+        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -G Ninja
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: camari-obs-plugin-linux-x64
+          path: camari-obs-plugin/build/camari-obs-plugin.so
+
   # ── OBS Plugin: Windows x64 ─────────────────────────────────────────────────
   obs-windows:
     name: OBS Plugin (Windows x64)
@@ -131,6 +160,13 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
+
+      - name: Install OBS Studio
+        shell: pwsh
+        run: |
+          $url = "https://github.com/obsproject/obs-studio/releases/download/31.1.1/OBS-Studio-31.1.1-Windows-Installer.exe"
+          Invoke-WebRequest -Uri $url -OutFile "$env:TEMP\obs-installer.exe"
+          Start-Process -FilePath "$env:TEMP\obs-installer.exe" -Args "/S" -Wait
 
       - name: Configure
         run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
@@ -160,6 +196,9 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
+
+      - name: Install OBS Studio
+        run: brew install --quiet obs-studio
 
       - name: Configure (x86_64)
         run: cmake -B build-x86 -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64
