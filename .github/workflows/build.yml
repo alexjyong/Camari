@@ -132,11 +132,6 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Setup OBS build environment
-        uses: obsproject/obs-studio/.github/actions/setup-obs-build@master
-        with:
-          obs-version: '31.1.1'
-
       - name: Configure
         run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
 
@@ -165,11 +160,6 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
-
-      - name: Setup OBS build environment
-        uses: obsproject/obs-studio/.github/actions/setup-obs-build@master
-        with:
-          obs-version: '31.1.1'
 
       - name: Configure (x86_64)
         run: cmake -B build-x86 -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64
