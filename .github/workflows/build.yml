@@ -1,10 +1,10 @@
-name: Build Android Version
+name: Build
 
 on:
   workflow_dispatch:
     inputs:
       output_type:
-        description: 'Output type'
+        description: 'Android output type'
         required: true
         default: 'apk'
         type: choice
@@ -12,11 +12,16 @@ on:
           - apk
           - aab
           - both
+      build_obs_plugin:
+        description: 'Build OBS plugin (Windows x64 + macOS Universal)'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
 
-  build:
-    name: Capacitor ${{ inputs.output_type }}
+  android-build:
+    name: Android (${{ inputs.output_type }})
     runs-on: ubuntu-latest
 
     steps:
@@ -112,3 +117,76 @@ jobs:
           name: camari-aab
           if-no-files-found: error
           path: mobile/android/app/build/outputs/bundle/release/camari-release.aab
+
+  # ── OBS Plugin: Windows x64 ─────────────────────────────────────────────────
+  obs-windows:
+    name: OBS Plugin (Windows x64)
+    if: inputs.build_obs_plugin
+    runs-on: windows-2022
+    defaults:
+      run:
+        working-directory: camari-obs-plugin
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Setup OBS build environment
+        uses: obsproject/obs-studio/.github/actions/setup-obs-build@master
+        with:
+          obs-version: '31.1.1'
+
+      - name: Configure
+        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Package
+        run: cmake --install build --config Release --prefix dist
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: camari-obs-plugin-windows-x64
+          path: camari-obs-plugin/dist/
+
+  # ── OBS Plugin: macOS Universal ─────────────────────────────────────────────
+  obs-macos:
+    name: OBS Plugin (macOS Universal)
+    if: inputs.build_obs_plugin
+    runs-on: macos-14
+    defaults:
+      run:
+        working-directory: camari-obs-plugin
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Setup OBS build environment
+        uses: obsproject/obs-studio/.github/actions/setup-obs-build@master
+        with:
+          obs-version: '31.1.1'
+
+      - name: Configure (x86_64)
+        run: cmake -B build-x86 -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64
+
+      - name: Configure (arm64)
+        run: cmake -B build-arm -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64
+
+      - name: Build (x86_64)
+        run: cmake --build build-x86 --config Release
+
+      - name: Build (arm64)
+        run: cmake --build build-arm --config Release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: camari-obs-plugin-macos
+          path: |
+            camari-obs-plugin/build-x86/
+            camari-obs-plugin/build-arm/

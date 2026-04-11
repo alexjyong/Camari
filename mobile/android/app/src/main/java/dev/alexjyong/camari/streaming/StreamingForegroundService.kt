@@ -6,6 +6,8 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.net.nsd.NsdManager
+import android.net.nsd.NsdServiceInfo
 import android.os.Binder
 import android.os.IBinder
 import android.util.Log
@@ -37,6 +39,8 @@ class StreamingForegroundService : Service() {
     private var cameraManager: CameraManager? = null
     private var activePort: Int = 0
     private var orientationListener: OrientationEventListener? = null
+    private var nsdManager: NsdManager? = null
+    private var nsdRegistrationListener: NsdManager.RegistrationListener? = null
 
     companion object {
         private const val TAG = "StreamingService"
@@ -130,6 +134,7 @@ class StreamingForegroundService : Service() {
         }.also { if (it.canDetectOrientation()) it.enable() }
 
         startForeground(NOTIFICATION_ID, buildNotification("Live at http://$ipAddress:$port/  open app to stop"))
+        registerNsdService(port)
         Log.i(TAG, "Streaming started on port $port")
         return port
     }
@@ -171,6 +176,11 @@ class StreamingForegroundService : Service() {
     // -------------------------------------------------------------------------
 
     private fun stopStreamingInternal() {
+        nsdRegistrationListener?.let {
+            try { nsdManager?.unregisterService(it) } catch (e: Exception) { /* already unregistered */ }
+        }
+        nsdRegistrationListener = null
+        nsdManager = null
         orientationListener?.disable()
         orientationListener = null
         httpServer?.stop()
@@ -178,6 +188,37 @@ class StreamingForegroundService : Service() {
         cameraManager?.stopCamera()
         cameraManager = null
         activePort = 0
+    }
+
+    private fun registerNsdService(port: Int) {
+        try {
+            val serviceInfo = NsdServiceInfo().apply {
+                serviceName = "Camari"
+                serviceType = "_camari._tcp"
+                setPort(port)
+            }
+            val listener = object : NsdManager.RegistrationListener {
+                override fun onServiceRegistered(info: NsdServiceInfo) {
+                    Log.i(TAG, "NSD registered as ${info.serviceName}")
+                }
+                override fun onRegistrationFailed(info: NsdServiceInfo, code: Int) {
+                    Log.w(TAG, "NSD registration failed: $code")
+                }
+                override fun onServiceUnregistered(info: NsdServiceInfo) {
+                    Log.i(TAG, "NSD unregistered")
+                }
+                override fun onUnregistrationFailed(info: NsdServiceInfo, code: Int) {
+                    Log.w(TAG, "NSD unregistration failed: $code")
+                }
+            }
+            nsdRegistrationListener = listener
+            nsdManager = getSystemService(NSD_SERVICE) as NsdManager
+            nsdManager!!.registerService(serviceInfo, NsdManager.PROTOCOL_DNS_SD, listener)
+        } catch (e: Exception) {
+            Log.w(TAG, "NSD registration error: ${e.message}")
+            nsdRegistrationListener = null
+            nsdManager = null
+        }
     }
 
     private fun createNotificationChannel() {
